@@ -10,7 +10,7 @@ export CGO_ENABLED=1 GOOS=ios GOARCH=arm64
 sdk=$(xcrun --sdk iphoneos --show-sdk-path)
 export CC="$(xcrun --sdk iphoneos --find clang)"
 export CGO_CFLAGS="-isysroot $sdk -arch arm64 -miphoneos-version-min=15.0"
-export CGO_LDFLAGS="$CGO_CFLAGS"
+export CGO_LDFLAGS="$CGO_CFLAGS -Wl,-no_warn_duplicate_libraries"
 host_arch=$(uname -m | sed 's/x86_64/amd64/')
 host_sdk=$(xcrun --sdk macosx --show-sdk-path)
 bundle="$app_root/build/ios/Payload/IPA Loader.app"
@@ -19,7 +19,7 @@ mkdir -p "$bundle"
 go build -trimpath -ldflags '-s -w' -o "$bundle/ipa-loader" ./cmd/ipa-loader-ios
 # Sharing adapter is prebuilt on the Mac; iOS never launches build tools.
 env GOOS=darwin GOARCH="$(uname -m | sed 's/x86_64/amd64/')" CGO_CFLAGS= CGO_LDFLAGS= go run scripts/build-sharing-macos.go "$bundle/sharing-ios"
-env GOOS=darwin GOARCH="$host_arch" CGO_CFLAGS="-isysroot $host_sdk" CGO_LDFLAGS="-isysroot $host_sdk" go run scripts/build-ios-icon.go "$bundle"
+env GOOS=darwin GOARCH="$host_arch" CGO_CFLAGS="-isysroot $host_sdk" CGO_LDFLAGS="-isysroot $host_sdk -Wl,-no_warn_duplicate_libraries" go run scripts/build-ios-icon.go "$bundle"
 env GOOS=darwin GOARCH="$host_arch" CGO_ENABLED=0 go run ./cmd/licenses "$bundle/licenses"
 python3 - "$bundle" <<'PY'
 import plistlib,sys,zipfile,shutil,os,re

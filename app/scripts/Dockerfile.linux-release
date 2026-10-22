@@ -1,7 +1,7 @@
 # Official Go 1.26.2 Debian trixie multi-platform manifest, pinned for repeatability.
 FROM golang:1.26.2-trixie@sha256:4a7137ea573f79c86ae451ff05817ed762ef5597fcf732259e97abeb3108d873
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl python3 make g++ git pkg-config \
+    ca-certificates curl xz-utils python3 make g++ git pkg-config \
     libgl-dev libglx-dev libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
     libxi-dev libxxf86vm-dev libwayland-dev libxkbcommon-dev libegl-dev libffi-dev lld \
     && rm -rf /var/lib/apt/lists/*

@@ -26,7 +26,7 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--zig', default=shutil.which('zig') or str(ROOT / '.cache/toolchains/zig/zig'))
-    parser.add_argument('--linker', default=shutil.which('ld64.lld') or shutil.which('ld64.lld-21'))
+    parser.add_argument('--linker', default=shutil.which('ld64.lld') or shutil.which('ld64.lld-21') or shutil.which('lld'))
     args = parser.parse_args()
     if not args.zig or not args.linker:
         parser.error('Supply --zig and --linker with Zig and LLVM ld64.lld executable paths')

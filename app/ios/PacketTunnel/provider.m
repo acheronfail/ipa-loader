@@ -28,8 +28,10 @@
  ipv4.includedRoutes=@[[[NEIPv4Route alloc] initWithDestinationAddress:@"10.7.0.1" subnetMask:@"255.255.255.255"]];
  ipv4.excludedRoutes=@[NEIPv4Route.defaultRoute];
  settings.IPv4Settings=ipv4;settings.MTU=@1500;
+ __weak typeof(self) weakSelf=self;
  [self setTunnelNetworkSettings:settings completionHandler:^(NSError *error){
-  if(!error){self.running=YES;[self readNext];}
+  typeof(self) strongSelf=weakSelf;
+  if(!error){strongSelf.running=YES;[strongSelf readNext];}
   completionHandler(error);
  }];
 }

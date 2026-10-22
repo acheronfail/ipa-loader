@@ -135,15 +135,11 @@ char *ipa_ios_connection_settings(int builtin, const char *address,
         if (root)
           break;
       }
+      // The app owns its window through the application delegate.
       if (!root) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        for (UIWindow *window in UIApplication.sharedApplication.windows)
-          if (window.isKeyWindow) {
-            root = window.rootViewController;
-            break;
-          }
-#pragma clang diagnostic pop
+        id<UIApplicationDelegate> delegate = UIApplication.sharedApplication.delegate;
+        if ([delegate respondsToSelector:@selector(window)])
+          root = delegate.window.rootViewController;
       }
       if (!root) {
         dispatch_semaphore_signal(ready);

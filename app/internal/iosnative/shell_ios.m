@@ -15,14 +15,11 @@ static UIViewController *ipaTopController(void) {
       for (UIWindow *window in ((UIWindowScene *)scene).windows)
         if (window.isKeyWindow)
           root = window.rootViewController;
-  // The app uses a single app-delegate-owned window, without a scene manifest.
+  // The app owns its window through the application delegate.
   if (!root) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    for (UIWindow *window in UIApplication.sharedApplication.windows)
-      if (window.isKeyWindow)
-        root = window.rootViewController;
-#pragma clang diagnostic pop
+    id<UIApplicationDelegate> delegate = UIApplication.sharedApplication.delegate;
+    if ([delegate respondsToSelector:@selector(window)])
+      root = delegate.window.rootViewController;
   }
   while (root.presentedViewController)
     root = root.presentedViewController;

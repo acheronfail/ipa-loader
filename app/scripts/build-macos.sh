@@ -11,6 +11,8 @@ export GOMODCACHE="$app_root/.cache/gomod"
 export GOCACHE="$app_root/.cache/build"
 export GOPATH="$app_root/.cache/gopath"
 export CGO_ENABLED=1
+# Go adds -lobjc for each Objective-C package; allow repeated runtime linkage.
+export CGO_LDFLAGS="${CGO_LDFLAGS:-} -Wl,-no_warn_duplicate_libraries"
 bundle="$app_root/build/IPA Loader.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 go run scripts/build-sharing-macos.go "$bundle/Contents/Resources/sharing-macos"

@@ -19,6 +19,11 @@ func main() {
 		panic("license output directory required")
 	}
 	out := os.Args[1]
+	download := exec.Command("go", "mod", "download", "all")
+	download.Stdout, download.Stderr = os.Stdout, os.Stderr
+	if err := download.Run(); err != nil {
+		panic("Could not download dependency notices")
+	}
 	data, err := exec.Command("go", "list", "-m", "-json", "all").Output()
 	if err != nil {
 		panic("Could not list dependency notices")
@@ -36,8 +41,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		if m.Main || m.Dir == "" {
+		if m.Main {
 			continue
+		}
+		if m.Dir == "" {
+			panic("Missing dependency source for notices: " + m.Path)
 		}
 		err = filepath.WalkDir(m.Dir, func(path string, d fs.DirEntry, e error) error {
 			if e != nil {

@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 45
     env:
       CGO_ENABLED: '1'
+      # Go adds -lobjc for each Objective-C package linked into a test binary.
+      CGO_LDFLAGS: '-Wl,-no_warn_duplicate_libraries'
       GOMODCACHE: ${{ github.workspace }}/app/.cache/gomod
       GOCACHE: ${{ github.workspace }}/app/.cache/build
       GOPATH: ${{ github.workspace }}/app/.cache/gopath
@@ -79,15 +81,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v8
-        with:
-          name: macos-and-ios
-          path: release-assets
+      - name: Download macOS and iOS assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh run download "$GITHUB_RUN_ID" --name macos-and-ios --dir release-assets
       - name: Supply the same iOS payloads to Linux and Windows
         run: |
           mkdir -p app/build/ios
@@ -101,6 +105,9 @@ jobs:
             --env GOMODCACHE=/src/app/.cache/gomod \
             --env GOCACHE=/src/app/.cache/build \
             --env GOPATH=/src/app/.cache/gopath \
+            --env XDG_CACHE_HOME=/src/app/.cache \
+            --env ZIG_GLOBAL_CACHE_DIR=/src/app/.cache/zig-global \
+            --env ZIG_LOCAL_CACHE_DIR=/src/app/.cache/zig-local \
             --env CGO_ENABLED=1 \
             ipa-loader-release sh -eu -c '
               go mod verify
@@ -115,7 +122,7 @@ jobs:
           cp app/build/release/IPA-Loader-linux-amd64.bin \
             app/build/release/IPA-Loader-windows-amd64.exe release-assets/
           cd release-assets
-          sha256sum IPA-Loader-* > SHA256SUMS.txt
+          sha256sum IPA-Loader-* IPA-Loader.ipa > SHA256SUMS.txt
       - name: Upload complete release artifacts
         uses: actions/upload-artifact@v7
         with:
