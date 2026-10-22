@@ -4,6 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+void ipa_ios_open_localdevvpn(void) {
+  [UIApplication.sharedApplication
+                openURL:[NSURL URLWithString:
+                                   @"https://apps.apple.com/app/id6755608044"]
+                options:@{}
+      completionHandler:nil];
+}
+
 @interface IPALoaderConnectionSettings
     : UITableViewController <UIAdaptivePresentationControllerDelegate>
 @property(nonatomic) BOOL builtin;
@@ -78,11 +86,7 @@
   if (path.section != 0)
     return;
   if (!self.builtin && path.row == 2) {
-    [UIApplication.sharedApplication
-                  openURL:[NSURL URLWithString:
-                                     @"https://apps.apple.com/app/id6755608044"]
-                  options:@{}
-        completionHandler:nil];
+    ipa_ios_open_localdevvpn();
   }
 }
 - (void)finish {
@@ -137,7 +141,8 @@ char *ipa_ios_connection_settings(int builtin, const char *address,
       }
       // The app owns its window through the application delegate.
       if (!root) {
-        id<UIApplicationDelegate> delegate = UIApplication.sharedApplication.delegate;
+        id<UIApplicationDelegate> delegate =
+            UIApplication.sharedApplication.delegate;
         if ([delegate respondsToSelector:@selector(window)])
           root = delegate.window.rootViewController;
       }
@@ -153,11 +158,13 @@ char *ipa_ios_connection_settings(int builtin, const char *address,
       settings.builtin = builtin;
       settings.done = dispatch_semaphore_create(0);
       settings.status =
-          builtin ? @"Use the Local VPN switch in Settings to connect this "
-                    @"iPhone. Disconnect other VPN apps first. IPA Loader "
-                    @"leaves the VPN off until you enable it."
-                  : @"Connect LocalDevVPN before installing apps. Use the "
-                    @"Device IP shown in LocalDevVPN below.";
+          builtin
+              ? @"Use the Local VPN switch in Settings to connect this "
+                @"iPhone. Disconnect other VPN apps first. IPA Loader "
+                @"leaves the VPN off until you enable it."
+              : @"Get LocalDevVPN from the App Store using the link below, "
+                @"then connect it and use Wi-Fi to install, refresh, and "
+                @"check apps. Enter the Device IP shown in LocalDevVPN below.";
       settings.address =
           [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 180, 44)];
       settings.address.text = ip;

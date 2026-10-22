@@ -17,7 +17,8 @@ static UIViewController *ipaTopController(void) {
           root = window.rootViewController;
   // The app owns its window through the application delegate.
   if (!root) {
-    id<UIApplicationDelegate> delegate = UIApplication.sharedApplication.delegate;
+    id<UIApplicationDelegate> delegate =
+        UIApplication.sharedApplication.delegate;
     if ([delegate respondsToSelector:@selector(window)])
       root = delegate.window.rootViewController;
   }
@@ -206,6 +207,10 @@ static IPACertificates *ipaCertificatesView;
                  @"sign-ins.";
   }
   if (section == 1) {
+    if (![ipaShellState[@"VPNAvailable"] boolValue])
+      return @"Install LocalDevVPN using the App Store link above, then connect "
+             @"it and use Wi-Fi to install, refresh, and check apps. In "
+             @"Connection Settings, use the Device IP shown in LocalDevVPN.";
     NSString *message = ipaShellState[@"VPNMessage"];
     return message.length
                ? message
@@ -253,23 +258,22 @@ static IPACertificates *ipaCertificatesView;
     return ipaTextCell(@"Switch Account", nil, YES, ready);
   }
   if (path.section == 1) {
-    if (path.row == 0) {
-      BOOL available = [ipaShellState[@"VPNAvailable"] boolValue];
+    BOOL builtin = [ipaShellState[@"VPNAvailable"] boolValue];
+    if (builtin && path.row == 0) {
       BOOL busy = [ipaShellState[@"VPNBusy"] boolValue];
-      UITableViewCell *cell = ipaTextCell(
-          @"Local VPN",
-          busy
-              ? ([ipaShellState[@"VPNRequested"] boolValue] ? @"Connecting…"
-                                                            : @"Disconnecting…")
-              : ([ipaShellState[@"VPNConnected"] boolValue]
-                     ? @"Connected to this iPhone"
-                     : (available ? @"Off · Required for app actions"
-                                  : @"Not included in this build")),
-          NO, YES);
+      UITableViewCell *cell =
+          ipaTextCell(@"Local VPN",
+                      busy ? ([ipaShellState[@"VPNRequested"] boolValue]
+                                  ? @"Connecting…"
+                                  : @"Disconnecting…")
+                           : ([ipaShellState[@"VPNConnected"] boolValue]
+                                  ? @"Connected to this iPhone"
+                                  : @"Off · Required for app actions"),
+                      NO, YES);
       UISwitch *toggle = [UISwitch new];
       toggle.on = busy ? [ipaShellState[@"VPNRequested"] boolValue]
                        : [ipaShellState[@"VPNConnected"] boolValue];
-      toggle.enabled = available && ready && !busy;
+      toggle.enabled = ready && !busy;
       toggle.accessibilityLabel = @"Local VPN";
       [toggle addTarget:self
                     action:@selector(toggleVPN:)
@@ -277,16 +281,16 @@ static IPACertificates *ipaCertificatesView;
       cell.accessoryView = toggle;
       return cell;
     }
-    UITableViewCell *cell =
-        ipaTextCell(path.row == 1 ? ([ipaShellState[@"VPNAvailable"] boolValue]
-                                         ? @"Connection Help"
-                                         : @"Connection Settings")
-                                  : @"Certificates",
-                    path.row == 1 ? ([ipaShellState[@"VPNAvailable"] boolValue]
-                                         ? @"Using the local VPN"
-                                         : @"Advanced connection options")
-                                  : @"Manage development certificates",
-                    YES, ready);
+    BOOL connection = path.row == (builtin ? 1 : 0);
+    BOOL store = !builtin && path.row == 1;
+    UITableViewCell *cell = ipaTextCell(
+        connection ? (builtin ? @"Connection Help" : @"Connection Settings")
+                   : (store ? @"Get LocalDevVPN" : @"Certificates"),
+        connection ? (builtin ? @"Using the local VPN"
+                              : @"Use the Device IP from LocalDevVPN")
+                   : (store ? @"Open in the App Store"
+                            : @"Manage development certificates"),
+        YES, ready);
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     return cell;
   }
@@ -352,10 +356,17 @@ static IPACertificates *ipaCertificatesView;
     }
     return;
   }
-  if (path.row == 0)
+  if (path.section != 1)
     return;
-  if (path.row == 1) {
+  BOOL builtin = [ipaShellState[@"VPNAvailable"] boolValue];
+  if (builtin && path.row == 0)
+    return;
+  if (path.row == (builtin ? 1 : 0)) {
     ipaSend(@{@"Kind" : @"connection"});
+    return;
+  }
+  if (!builtin && path.row == 1) {
+    ipa_ios_open_localdevvpn();
     return;
   }
   ipaCertificatesView =

@@ -9,6 +9,8 @@ Self-contained IPA loading for Desktop and iPhone. Sideload your apps from macOS
 
 Install the latest from [releases](https://github.com/acheronfail/ipa-loader/releases).
 
+Free Apple developer accounts need `IPA-Loader-Free-Accounts.ipa` and [LocalDevVPN](https://apps.apple.com/app/id6755608044); paid accounts can use `IPA-Loader-Paid-Accounts.ipa`, which includes its own local VPN. The desktop app bundles both and automatically picks the right one during setup.
+
 ## Screenshots
 
 | Desktop | iPhone |

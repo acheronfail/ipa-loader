@@ -345,6 +345,28 @@ func TestRepeatedVPNStatusDoesNotPublishUnchangedUI(t *testing.T) {
 	}
 }
 
+func TestExternalVPNDoesNotGateActionsOrInvokeBuiltinToggle(t *testing.T) {
+	deviceCalls, toggleCalls := 0, 0
+	c := signedInController(Services{
+		VPNState: func() (bool, bool) { return false, false },
+		SetVPN:   func(bool) error { toggleCalls++; return errors.New("unexpected VPN control") },
+		Device: func(context.Context) (platform.Device, error) {
+			deviceCalls++
+			return platform.Device{}, errors.New("device probe")
+		},
+	})
+	c.Handle(Action{Kind: "vpnstatus"})
+	c.Handle(Action{Kind: "vpn", Value: "on"})
+	c.Handle(Action{Kind: "vpn", Value: "off"})
+	c.Handle(Action{Kind: "refresh", Value: "app"})
+	if deviceCalls != 1 || toggleCalls != 0 {
+		t.Fatalf("external VPN invoked built-in controls or blocked refresh: device=%d toggle=%d", deviceCalls, toggleCalls)
+	}
+	if state := c.Snapshot(); state.VPNAvailable || state.VPNBusy || state.VPNMessage != "" {
+		t.Fatalf("external VPN acquired built-in state: %+v", state)
+	}
+}
+
 func TestImportRetainsIPAOnlyWhenChosen(t *testing.T) {
 	for _, retain := range []bool{false, true} {
 		t.Run(map[bool]string{false: "discard", true: "keep"}[retain], func(t *testing.T) {

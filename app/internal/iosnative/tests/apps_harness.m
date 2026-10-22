@@ -12,6 +12,20 @@ static NSDictionary *sample;
 static NSArray *previewLogs;
 static NSInteger operationIdentity = 1;
 static BOOL cancelledOperation;
+static BOOL builtinVPN = YES;
+static NSURL *openedURL;
+static NSString *lastAction;
+@interface HarnessApplication : UIApplication
+@end
+@implementation HarnessApplication
+- (void)openURL:(NSURL *)url
+              options:(NSDictionary *)options
+    completionHandler:(void (^)(BOOL))completion {
+  openedURL = url;
+  if (completion)
+    completion(YES);
+}
+@end
 extern void ipa_ios_shell_update(const char *json);
 void ipa_go_apps_load(int check) {
   inventoryReads++;
@@ -32,12 +46,13 @@ void ipa_go_shell_action(char *json) {
       JSONObjectWithData:[@(json) dataUsingEncoding:NSUTF8StringEncoding]
                  options:0
                    error:nil];
+  lastAction = action[@"Kind"];
   if ([action[@"Kind"] isEqual:@"import"])
     importRequests++;
   if ([action[@"Kind"] isEqual:@"connection"])
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
       int failed = 0;
-      free(ipa_ios_connection_settings(1, "10.7.0.1", &failed));
+      free(ipa_ios_connection_settings(builtinVPN, "10.7.0.1", &failed));
     });
 }
 static void publish(BOOL signedIn, BOOL busy, NSString *message) {
@@ -66,8 +81,8 @@ static void publish(BOOL signedIn, BOOL busy, NSString *message) {
     @"OperationID" : @(operationIdentity),
     @"Cancelled" : @(cancelledOperation),
     @"EligibleRefreshes" : @1,
-    @"VPNAvailable" : @YES,
-    @"VPNConnected" : @YES
+    @"VPNAvailable" : @(builtinVPN),
+    @"VPNConnected" : @(builtinVPN)
   };
   NSData *data = [NSJSONSerialization dataWithJSONObject:state
                                                  options:0
@@ -149,6 +164,23 @@ static void trackReloads(UITableViewController *controller, NSInteger tag) {
   table.delegate = controller;
   controller.tableView = table;
 }
+// UIKit transitions can outlast a fixed delay on a busy CI simulator.
+static void waitForUIUntil(BOOL (^ready)(void), dispatch_block_t check,
+                           NSTimeInterval deadline) {
+  if (ready()) {
+    check();
+    return;
+  }
+  NSCAssert(NSProcessInfo.processInfo.systemUptime < deadline,
+            @"Timed out waiting for the UIKit transition");
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC),
+                 dispatch_get_main_queue(), ^{
+                   waitForUIUntil(ready, check, deadline);
+                 });
+}
+static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
+  waitForUIUntil(ready, check, NSProcessInfo.processInfo.systemUptime + 10);
+}
 @interface AppsHarness : UIResponder <UIApplicationDelegate>
 @property(nonatomic, strong) UIWindow *window;
 @end
@@ -204,9 +236,156 @@ static void trackReloads(UITableViewController *controller, NSInteger tag) {
                   containsObject:@"--progress"])
             publish(YES, YES, @"1 of 2 · Sample\nChecking signing profile…");
         });
+  } else if ([NSProcessInfo.processInfo.arguments
+                 containsObject:@"--connection-checks"]) {
+    builtinVPN =
+        ![NSProcessInfo.processInfo.arguments containsObject:@"--localdevvpn"];
+    [self runConnectionChecks];
   } else
     [self runChecks];
   return YES;
+}
+- (void)runConnectionChecks {
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+      dispatch_get_main_queue(), ^{
+        UINavigationController *accountNavigation =
+            (UINavigationController *)ipaAccountNavigation;
+        UITableViewController *account =
+            (UITableViewController *)accountNavigation.topViewController;
+        // Exercise both authenticated layouts: no toggle or certificate rows
+        // may leak into the external variant when its account state changes.
+        for (NSNumber *signedIn in @[ @NO, @YES ]) {
+          publish(signedIn.boolValue, NO, @"");
+          dispatch_async(dispatch_get_main_queue(), ^{
+            NSInteger rows =
+                [account.tableView.dataSource tableView:account.tableView
+                                  numberOfRowsInSection:1];
+            NSCAssert(rows == (signedIn.boolValue ? 3 : 2),
+                      @"Connection row count changed");
+            for (NSInteger row = 0; row < rows; row++) {
+              UITableViewCell *cell = [account.tableView.dataSource
+                              tableView:account.tableView
+                  cellForRowAtIndexPath:[NSIndexPath indexPathForRow:row
+                                                           inSection:1]];
+              BOOL toggle = [cell.accessoryView isKindOfClass:UISwitch.class];
+              NSCAssert(toggle == (builtinVPN && row == 0),
+                        @"Wrong variant shows a VPN toggle");
+              if (toggle) {
+                UISwitch *control = (UISwitch *)cell.accessoryView;
+                NSCAssert(control.on && control.enabled,
+                          @"Built-in VPN toggle lost its state");
+              }
+              NSString *title =
+                  row == 2
+                      ? @"Certificates"
+                      : (builtinVPN
+                             ? (row == 0 ? @"Local VPN" : @"Connection Help")
+                             : (row == 0 ? @"Connection Settings"
+                                         : @"Get LocalDevVPN"));
+              NSCAssert([cell.textLabel.text isEqual:title],
+                        @"Connection row title is incorrect");
+            }
+            NSString *footer =
+                [account.tableView.dataSource tableView:account.tableView
+                                titleForFooterInSection:1];
+            NSCAssert([footer containsString:builtinVPN ? @"Local VPN"
+                                                        : @"LocalDevVPN"],
+                      @"Connection footer uses wrong variant");
+            NSCAssert(builtinVPN || (![footer containsString:@"Local VPN"] &&
+                                     [footer containsString:@"Device IP"]),
+                      @"External footer refers to built-in controls");
+          });
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+          ipaTabs.selectedIndex = 1;
+          if (!builtinVPN) {
+            [account.tableView.delegate
+                              tableView:account.tableView
+                didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:1
+                                                           inSection:1]];
+            NSCAssert(
+                [openedURL.absoluteString
+                    isEqual:@"https://apps.apple.com/app/id6755608044"],
+                @"Main Settings does not open LocalDevVPN's App Store page");
+            openedURL = nil;
+          }
+          [account.tableView.delegate
+                            tableView:account.tableView
+              didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2
+                                                         inSection:1]];
+          [accountNavigation.topViewController loadViewIfNeeded];
+          NSCAssert([lastAction isEqual:@"certificates"] &&
+                        [accountNavigation.topViewController.title
+                            isEqual:@"Certificates"],
+                    @"Certificate row routed to the wrong action");
+          [accountNavigation popToRootViewControllerAnimated:NO];
+          [account.tableView.delegate
+                            tableView:account.tableView
+              didSelectRowAtIndexPath:[NSIndexPath
+                                          indexPathForRow:builtinVPN ? 1 : 0
+                                                inSection:1]];
+          NSCAssert([lastAction isEqual:@"connection"],
+                    @"Connection row routed to the wrong action");
+        });
+      });
+  waitForUI(
+      ^BOOL {
+        UINavigationController *nav =
+            (UINavigationController *)ipaTabs.presentedViewController;
+        return [nav isKindOfClass:UINavigationController.class] &&
+               nav.topViewController.view.window != nil;
+      },
+      ^{
+        UINavigationController *nav =
+            (UINavigationController *)ipaTabs.presentedViewController;
+        UITableViewController *settings =
+            (UITableViewController *)nav.topViewController;
+        NSCAssert([settings.title isEqual:builtinVPN ? @"Connection Help"
+                                                     : @"Connection Settings"],
+                  @"Wrong connection sheet");
+        NSInteger rows =
+            [settings.tableView.dataSource tableView:settings.tableView
+                               numberOfRowsInSection:0];
+        NSCAssert(rows == (builtinVPN ? 1 : 3),
+                  @"Connection sheet has wrong variant's controls");
+        UITableViewCell *help = [settings.tableView.dataSource
+                        tableView:settings.tableView
+            cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+        NSCAssert([help.textLabel.text containsString:builtinVPN
+                                                          ? @"Local VPN switch"
+                                                          : @"LocalDevVPN"],
+                  @"Connection sheet guidance is incorrect");
+        if (!builtinVPN) {
+          NSCAssert(![help.textLabel.text containsString:@"Local VPN"] &&
+                        [help.textLabel.text containsString:@"refresh"],
+                    @"External connection sheet mentions built-in controls");
+          UITableViewCell *ip = [settings.tableView.dataSource
+                          tableView:settings.tableView
+              cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1
+                                                       inSection:0]];
+          NSCAssert([ip.textLabel.text isEqual:@"Device IP"] &&
+                        [ip.accessoryView isKindOfClass:UITextField.class],
+                    @"LocalDevVPN Device IP field is missing");
+          UITableViewCell *store = [settings.tableView.dataSource
+                          tableView:settings.tableView
+              cellForRowAtIndexPath:[NSIndexPath indexPathForRow:2
+                                                       inSection:0]];
+          NSCAssert([store.textLabel.text isEqual:@"Get LocalDevVPN"],
+                    @"LocalDevVPN App Store link is missing");
+          [settings.tableView.delegate
+                            tableView:settings.tableView
+              didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:2
+                                                         inSection:0]];
+          NSCAssert([openedURL.absoluteString
+                        isEqual:@"https://apps.apple.com/app/id6755608044"],
+                    @"Connection sheet opens the wrong App Store page");
+        }
+        NSLog(
+            @"PASS: %@ connection controls, copy, routing and App Store links",
+            builtinVPN ? @"built-in VPN" : @"LocalDevVPN");
+        exit(0);
+      });
 }
 - (void)runChecks {
   dispatch_after(
@@ -279,8 +458,7 @@ static void trackReloads(UITableViewController *controller, NSInteger tag) {
         NSCAssert(refreshRequests == 1,
                   @"Immediate duplicate refresh accepted");
         publish(YES, YES, @"Applying profiles");
-        NSLog(
-            @"PASS: validated account enables refresh without leaving Apps");
+        NSLog(@"PASS: validated account enables refresh without leaving Apps");
       });
   dispatch_after(
       dispatch_time(DISPATCH_TIME_NOW, 1000 * NSEC_PER_MSEC),
@@ -467,29 +645,35 @@ static void trackReloads(UITableViewController *controller, NSInteger tag) {
                                               @"Connecting to this iPhone…");
                                     }];
       });
-  dispatch_after(
-      dispatch_time(DISPATCH_TIME_NOW, 4200 * NSEC_PER_MSEC),
-      dispatch_get_main_queue(), ^{
-        NSCAssert(ipaProgress.navigationController.presentingViewController !=
-                      nil,
-                  @"Cancellation test progress did not open");
-        cancelledOperation = YES;
-        publish(YES, NO, @"");
-      });
-  dispatch_after(
-      dispatch_time(DISPATCH_TIME_NOW, 4600 * NSEC_PER_MSEC),
-      dispatch_get_main_queue(), ^{
-        NSCAssert(!ipaProgress.navigationController.presentingViewController &&
-                      ipaApps.tableView.tableHeaderView == nil,
-                  @"Cancelled operation left a progress/error sheet");
-        NSLog(@"PASS: cancellation quietly dismisses the progress sheet");
-        exit(0);
-      });
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 4200 * NSEC_PER_MSEC),
+                 dispatch_get_main_queue(), ^{
+                   waitForUI(
+                       ^BOOL {
+                         return ipaProgress.navigationController
+                                    .presentingViewController != nil;
+                       },
+                       ^{
+                         cancelledOperation = YES;
+                         publish(YES, NO, @"");
+                         waitForUI(
+                             ^BOOL {
+                               return !ipaProgress.navigationController
+                                           .presentingViewController &&
+                                      ipaApps.tableView.tableHeaderView == nil;
+                             },
+                             ^{
+                               NSLog(@"PASS: cancellation quietly dismisses "
+                                     @"the progress sheet");
+                               exit(0);
+                             });
+                       });
+                 });
 }
 @end
 int main(int argc, char **argv) {
   @autoreleasepool {
-    return UIApplicationMain(argc, argv, nil,
+    return UIApplicationMain(argc, argv,
+                             NSStringFromClass(HarnessApplication.class),
                              NSStringFromClass(AppsHarness.class));
   }
 }

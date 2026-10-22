@@ -100,7 +100,7 @@ func InitializeIOS() error {
 			return err
 		}
 	}
-	if err = mobiledevice.ConfigureDirectDevice(mobiledevice.DirectDevice{UDID: c.UDID, Address: c.Address, PairRecord: c.PairRecord}); err != nil {
+	if err = mobiledevice.ConfigureDirectDevice(mobiledevice.DirectDevice{UDID: c.UDID, Address: c.Address, PairRecord: c.PairRecord, BuiltInVPN: iosnative.HasVPN()}); err != nil {
 		return err
 	}
 	if fromDesktop {
@@ -152,7 +152,7 @@ func SetIOSDeviceAddress(address string) error {
 	if err = securestore.Write(iosConfigPath(), raw); err != nil {
 		return err
 	}
-	if err = mobiledevice.ConfigureDirectDevice(mobiledevice.DirectDevice{UDID: c.UDID, Address: c.Address, PairRecord: c.PairRecord}); err != nil {
+	if err = mobiledevice.ConfigureDirectDevice(mobiledevice.DirectDevice{UDID: c.UDID, Address: c.Address, PairRecord: c.PairRecord, BuiltInVPN: iosnative.HasVPN()}); err != nil {
 		return err
 	}
 	iosSetup.config = &c

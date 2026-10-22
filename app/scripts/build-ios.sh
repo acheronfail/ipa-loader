@@ -5,6 +5,9 @@ set -eu
 app_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$app_root"
 [ "$(uname -s)" = Darwin ] || { echo 'Build the iOS payload on macOS with Xcode.' >&2; exit 1; }
+# Remove the previous generated names so local builds expose only the two
+# account-specific packages. Desktop packaging also copies these explicitly.
+rm -f build/ios/IPA-Loader.ipa build/ios/IPA-Loader-VPN.ipa
 export GOMODCACHE="$app_root/.cache/gomod" GOCACHE="$app_root/.cache/build" GOPATH="$app_root/.cache/gopath"
 export CGO_ENABLED=1 GOOS=ios GOARCH=arm64
 sdk=$(xcrun --sdk iphoneos --show-sdk-path)
@@ -42,7 +45,7 @@ python3 - "$app_root/build/ios" <<'PY'
 from pathlib import Path
 import sys,zipfile
 root=Path(sys.argv[1])
-target=root/'IPA-Loader.ipa'
+target=root/'IPA-Loader-Free-Accounts.ipa'
 with zipfile.ZipFile(target.with_suffix('.ipa.tmp'),'w',zipfile.ZIP_DEFLATED) as z:
  for p in sorted((root/'Payload').rglob('*')):
   if p.is_file():z.write(p,p.relative_to(root))
@@ -70,7 +73,7 @@ info['NSLocalNetworkUsageDescription']='Connect to this iPhone to install and re
 PY
 codesign --force --sign - --entitlements "$vpn_root/network-entitlements.plist" "$extension"
 codesign --force --sign - --entitlements "$vpn_root/network-entitlements.plist" "$vpn_bundle"
-python3 - "$vpn_root" "$app_root/build/ios/IPA-Loader-VPN.ipa" <<'PY'
+python3 - "$vpn_root" "$app_root/build/ios/IPA-Loader-Paid-Accounts.ipa" <<'PY'
 from pathlib import Path
 import sys,zipfile
 root,target=map(Path,sys.argv[1:])

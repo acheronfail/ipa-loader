@@ -14,8 +14,8 @@ just ios
 just release macos
 ```
 
-Both device payloads target arm64 and iOS 15+: `app/build/ios/IPA-Loader.ipa`
-(uses external LocalDevVPN) and `app/build/ios/IPA-Loader-VPN.ipa` (includes a
+Both device payloads target arm64 and iOS 15+: `app/build/ios/IPA-Loader-Free-Accounts.ipa`
+(uses external LocalDevVPN) and `app/build/ios/IPA-Loader-Paid-Accounts.ipa` (includes a
 packet tunnel extension). Packaging embeds both in the desktop release. For
 Linux and Windows, copy the Mac-built payloads into `app/build/ios/` before
 packaging. Unbundled desktop runs can set `IPA_LOADER_IOS_IPA` to an absolute IPA
@@ -40,8 +40,10 @@ compatibility with saved desktop accounts.
    removes the envelope from Documents. Sign in with the same Apple Account.
 4. Use Wi-Fi. Paid developer teams receive the built-in VPN variant: allow its
    configuration using **Local VPN** in Settings and disconnect other VPNs.
-   Free teams use LocalDevVPN and its Device IP in Connection Settings (default
-   `10.7.0.1`). The connection authenticates using the imported pairing record
+   Free teams use [LocalDevVPN from the App Store](https://apps.apple.com/app/id6755608044)
+   and its Device IP in Connection Settings (default `10.7.0.1`). Settings includes
+   a **Get LocalDevVPN** link and hides the built-in VPN switch in this variant.
+   The connection authenticates using the imported pairing record
    and pinned device certificate.
 
 The desktop transfers pairing credentials and a signing key so the phone can
@@ -130,7 +132,11 @@ sh app/scripts/test-ios-apps.sh <simulator-udid>
 python3 scripts/verify_committed_fixtures.py
 ```
 
-The UIKit harness checks account/VPN gating, refresh without tab switching,
+Omit the simulator ID to select an available iPhone simulator automatically;
+the script boots and shuts it down if needed. CI runs this harness too.
+
+The UIKit harness checks both connection variants' controls, guidance, row actions,
+and LocalDevVPN App Store links, plus account/VPN gating, refresh without tab switching,
 stable controls during repeated progress, review cancellation, optional IPA
 retention, account menus, Details layout and rounded icons. Portable tests cover
 profile validation/readback, fallback boundaries, history and account state.

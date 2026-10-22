@@ -16,11 +16,12 @@ export CGO_LDFLAGS="${CGO_LDFLAGS:-} -Wl,-no_warn_duplicate_libraries"
 bundle="$app_root/build/IPA Loader.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 go run scripts/build-sharing-macos.go "$bundle/Contents/Resources/sharing-macos"
-if [ ! -f build/ios/IPA-Loader.ipa ] || [ ! -f build/ios/IPA-Loader-VPN.ipa ]; then
+if [ ! -f build/ios/IPA-Loader-Free-Accounts.ipa ] || [ ! -f build/ios/IPA-Loader-Paid-Accounts.ipa ]; then
   sh scripts/build-ios.sh
 fi
+rm -rf "$bundle/Contents/Resources/ios"
 mkdir -p "$bundle/Contents/Resources/ios"
-cp build/ios/IPA-Loader*.ipa "$bundle/Contents/Resources/ios/"
+cp build/ios/IPA-Loader-Free-Accounts.ipa build/ios/IPA-Loader-Paid-Accounts.ipa "$bundle/Contents/Resources/ios/"
 go build -trimpath -ldflags '-s -w' -o "$bundle/Contents/MacOS/ipa-loader" ./cmd/ipa-loader
 go run ./cmd/icon "$app_root/build/AppIcon.iconset"
 iconutil -c icns "$app_root/build/AppIcon.iconset" -o "$bundle/Contents/Resources/AppIcon.icns"

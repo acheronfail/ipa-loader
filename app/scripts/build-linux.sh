@@ -21,12 +21,13 @@ go run ./cmd/licenses "$bundle/licenses"
 rm -rf "$bundle/signing-linux" "$bundle/sharing-linux" "$bundle/keyring-linux"
 cp -R build/sharing-linux build/keyring-linux "$bundle/"
 # Bootstrap payloads are built on macOS and supplied to this host build.
-if [ ! -f build/ios/IPA-Loader.ipa ] || [ ! -f build/ios/IPA-Loader-VPN.ipa ]; then
-  echo 'Missing build/ios/IPA-Loader.ipa. Build with just ios on macOS and copy it here.' >&2
+if [ ! -f build/ios/IPA-Loader-Free-Accounts.ipa ] || [ ! -f build/ios/IPA-Loader-Paid-Accounts.ipa ]; then
+  echo 'Missing account-specific iOS packages. Build with just ios on macOS and copy both IPAs here.' >&2
   exit 1
 fi
+rm -rf "$bundle/ios"
 mkdir -p "$bundle/ios"
-cp build/ios/IPA-Loader*.ipa "$bundle/ios/"
+cp build/ios/IPA-Loader-Free-Accounts.ipa build/ios/IPA-Loader-Paid-Accounts.ipa "$bundle/ios/"
 # Embed helpers, corresponding sources and all dependency notices in the binary.
 go run ./cmd/embed-runtime internal/runtimebundle/payload.zip "$bundle/sharing-linux" "$bundle/keyring-linux" "$bundle/licenses" "$bundle/ios"
 go build -tags bundled -trimpath -ldflags '-s -w' -o "$bundle/ipa-loader" ./cmd/ipa-loader

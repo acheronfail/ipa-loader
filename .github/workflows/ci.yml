@@ -70,14 +70,21 @@ jobs:
         run: go test -race -count=1 -tags ci ./...
       - name: Vet
         run: go vet -tags ci ./...
+      - name: Test native iOS UI and both VPN variants
+        timeout-minutes: 10
+        run: sh scripts/test-ios-apps.sh
       - name: Test macOS signing and notarization failure handling
         run: node --test ../scripts/macos-notarization.test.mjs
       - name: Build and audit macOS app and both iOS payloads
         if: github.ref_type == 'tag'
         run: |
           go run ./cmd/release macos
+          for ipa in build/ios/IPA-Loader-Free-Accounts.ipa build/ios/IPA-Loader-Paid-Accounts.ipa; do
+            IPA_LOADER_TEST_IOS_IPA="$PWD/$ipa" go test -count=1 -tags ci \
+              -run '^TestBuiltIOSLoaderPassesProductionPreflight$' ./internal/platform
+          done
           mkdir -p build/release-assets
-          cp build/ios/IPA-Loader.ipa build/ios/IPA-Loader-VPN.ipa build/release-assets/
+          cp build/ios/IPA-Loader-Free-Accounts.ipa build/ios/IPA-Loader-Paid-Accounts.ipa build/release-assets/
       # Same hosted-runner HTTP/3 workaround used by float-view-mobile.
       # https://github.com/actions/runner-images/issues/14924
       - name: Work around Apple ticket delivery networking
@@ -128,7 +135,7 @@ jobs:
       - name: Supply the same iOS payloads to Linux and Windows
         run: |
           mkdir -p app/build/ios
-          cp release-assets/IPA-Loader.ipa release-assets/IPA-Loader-VPN.ipa app/build/ios/
+          cp release-assets/IPA-Loader-Free-Accounts.ipa release-assets/IPA-Loader-Paid-Accounts.ipa app/build/ios/
       - name: Build pinned Linux and Windows toolchain
         run: docker build --platform linux/amd64 -f app/scripts/Dockerfile.linux-release -t ipa-loader-release app/scripts
       - name: Test Linux and build and audit Linux and Windows packages
@@ -155,7 +162,7 @@ jobs:
           cp app/build/release/IPA-Loader-linux-amd64.bin \
             app/build/release/IPA-Loader-windows-amd64.exe release-assets/
           cd release-assets
-          sha256sum IPA-Loader-* IPA-Loader.ipa > SHA256SUMS.txt
+          sha256sum IPA-Loader-* > SHA256SUMS.txt
       - name: Upload complete release artifacts
         uses: actions/upload-artifact@v7
         with:

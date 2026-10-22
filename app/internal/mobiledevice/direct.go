@@ -21,6 +21,7 @@ import (
 type DirectDevice struct {
 	UDID, Address string
 	PairRecord    []byte
+	BuiltInVPN    bool
 }
 
 func (DirectDevice) String() string   { return "Private on-device connection" }
@@ -88,6 +89,9 @@ func (d *DirectDevice) dial(ctx context.Context, port uint16) (net.Conn, error) 
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
+		}
+		if d.BuiltInVPN {
+			return nil, errors.New("Enable Local VPN in IPA Loader’s Settings and connect to Wi-Fi, then try again")
 		}
 		return nil, errors.New("Connect LocalDevVPN and Wi-Fi, then try again. Check that its Device IP matches IPA Loader's connection settings")
 	}

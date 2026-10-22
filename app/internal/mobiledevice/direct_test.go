@@ -41,6 +41,25 @@ func TestDirectRouteRejectsIncompletePairingBeforeConnecting(t *testing.T) {
 	}
 }
 
+func TestDirectConnectionFailureMatchesVPNVariant(t *testing.T) {
+	// An invalid numeric address fails before reaching the network.
+	for _, builtin := range []bool{false, true} {
+		d := DirectDevice{Address: "invalid:address", BuiltInVPN: builtin}
+		_, err := d.dial(context.Background(), 62078)
+		if err == nil {
+			t.Fatal("invalid address connected")
+		}
+		message := err.Error()
+		if builtin {
+			if !strings.Contains(message, "Enable Local VPN") || strings.Contains(message, "LocalDevVPN") {
+				t.Fatalf("wrong built-in VPN guidance: %s", message)
+			}
+		} else if !strings.Contains(message, "LocalDevVPN") || !strings.Contains(message, "Device IP") {
+			t.Fatalf("wrong external VPN guidance: %s", message)
+		}
+	}
+}
+
 func TestDirectSessionRequiresTLSAndMatchingHardwareIdentity(t *testing.T) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

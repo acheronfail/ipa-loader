@@ -11,6 +11,38 @@ import (
 	"testing"
 )
 
+func TestLoaderIPASelectionByAccount(t *testing.T) {
+	root := t.TempDir()
+	free := filepath.Join(root, "IPA-Loader-Free-Accounts.ipa")
+	paid := filepath.Join(root, "IPA-Loader-Paid-Accounts.ipa")
+	for _, path := range []string{free, paid} {
+		if err := os.WriteFile(path, []byte("payload"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, account := range []struct {
+		name string
+		paid bool
+		want string
+	}{{"free", false, free}, {"paid", true, paid}} {
+		t.Run(account.name, func(t *testing.T) {
+			got, err := loaderIPAForAccount(free, account.paid)
+			if err != nil || got != account.want {
+				t.Fatalf("selected %q, %v; want %q", got, err, account.want)
+			}
+		})
+	}
+	if err := os.Remove(paid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loaderIPAForAccount(free, true); err == nil || !strings.Contains(err.Error(), "IPA-Loader-Paid-Accounts.ipa") {
+		t.Fatalf("missing paid package must report its filename, got %v", err)
+	}
+	if got, err := loaderIPAForAccount(free, false); err != nil || got != free {
+		t.Fatalf("free accounts should not require the paid package: %q, %v", got, err)
+	}
+}
+
 func TestBuiltIOSLoaderPassesProductionPreflight(t *testing.T) {
 	input := os.Getenv("IPA_LOADER_TEST_IOS_IPA")
 	if input == "" {
@@ -25,7 +57,7 @@ func TestBuiltIOSLoaderPassesProductionPreflight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.HasSuffix(input, "-VPN.ipa") {
+	if strings.HasSuffix(input, "-Paid-Accounts.ipa") {
 		if !app.Networking.PacketTunnel || len(app.Embedded) != 1 || !app.Embedded[0].Extension || !app.Embedded[0].Networking.PacketTunnel {
 			t.Fatal("VPN package is missing its requested packet tunnel or extension")
 		}

@@ -5,7 +5,7 @@ package iosapp
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -37,7 +37,7 @@ func Run() {
 		}
 		message := ""
 		if err != nil {
-			message = "Couldn’t check this iPhone. Showing saved dates. Enable Local VPN in Settings and pull down to retry."
+			message = connectionFailureMessage(iosnative.HasVPN(), true)
 		}
 		if setupErr != nil {
 			message = "Setup needs attention. Connect this iPhone to the desktop app and install IPA Loader again."
@@ -62,7 +62,7 @@ func Run() {
 					return d, nil
 				}
 			}
-			return platform.Device{}, fmt.Errorf("Couldn’t connect to this iPhone. Check Local VPN in Settings.")
+			return platform.Device{}, errors.New(connectionFailureMessage(iosnative.HasVPN(), false))
 		},
 		Refresh: func(ctx context.Context, s *apple.Session, team, id string, d platform.Device, p func(platform.Progress)) (platform.Result, error) {
 			return platform.RefreshIOSApp(ctx, client, s, team, id, d, p)

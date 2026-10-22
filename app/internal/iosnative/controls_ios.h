@@ -5,3 +5,4 @@ UIBarButtonItem *ipa_ios_bar_button(NSString *title, id target, SEL action,
 void ipa_ios_dismiss(UIViewController *controller, dispatch_block_t completion);
 
 UIImageView *ipa_ios_app_icon(UIImage *image, CGFloat size);
+void ipa_ios_open_localdevvpn(void);

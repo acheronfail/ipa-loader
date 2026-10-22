@@ -52,13 +52,13 @@ def main():
         p=stage/name
         if p.exists():shutil.rmtree(p)
     shutil.copytree(sharing,stage/'sharing-windows')
-    ios=ROOT/'build/ios/IPA-Loader.ipa'
-    if not ios.is_file(): raise SystemExit('Build just ios on macOS and supply build/ios/IPA-Loader.ipa before packaging')
+    ios=ROOT/'build/ios/IPA-Loader-Free-Accounts.ipa'
+    if not ios.is_file(): raise SystemExit('Build just ios on macOS and supply build/ios/IPA-Loader-Free-Accounts.ipa before packaging')
     (stage/'ios').mkdir(exist_ok=True)
-    shutil.copy2(ios,stage/'ios/IPA-Loader.ipa')
-    vpn=ios.with_name('IPA-Loader-VPN.ipa')
-    if not vpn.is_file(): raise SystemExit('Missing IPA-Loader-VPN.ipa')
-    shutil.copy2(vpn,stage/'ios/IPA-Loader-VPN.ipa')
+    shutil.copy2(ios,stage/'ios/IPA-Loader-Free-Accounts.ipa')
+    vpn=ios.with_name('IPA-Loader-Paid-Accounts.ipa')
+    if not vpn.is_file(): raise SystemExit('Missing IPA-Loader-Paid-Accounts.ipa')
+    shutil.copy2(vpn,stage/'ios/IPA-Loader-Paid-Accounts.ipa')
     host=dict(env,CGO_ENABLED='0',ZIG=zig)
     run(['go','run','./cmd/licenses',stage/'licenses'],host)
     run(['go','run','./cmd/embed-runtime','internal/runtimebundle/payload.zip',stage/'sharing-windows',stage/'licenses',stage/'ios'],host)

@@ -684,7 +684,7 @@ func (c *Controller) updateVPN() {
 }
 func (c *Controller) setVPN(on bool) {
 	c.mu.Lock()
-	if c.state.Busy || c.state.VPNBusy || c.services.SetVPN == nil {
+	if c.state.Busy || c.state.VPNBusy || !c.state.VPNAvailable || c.services.SetVPN == nil {
 		c.mu.Unlock()
 		return
 	}

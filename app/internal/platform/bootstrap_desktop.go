@@ -44,11 +44,9 @@ func BootstrapLoader(ctx context.Context, client *apple.Client, session *apple.S
 			builtInVPN = candidate.LimitKnown && candidate.AppIDsUnlimited
 		}
 	}
-	if builtInVPN {
-		filename = filepath.Join(filepath.Dir(filename), "IPA-Loader-VPN.ipa")
-		if st, err := os.Stat(filename); err != nil || !st.Mode().IsRegular() {
-			return result, errors.New("The paid-team iOS package is missing: include IPA-Loader-VPN.ipa with this desktop release")
-		}
+	filename, err = loaderIPAForAccount(filename, builtInVPN)
+	if err != nil {
+		return result, err
 	}
 	info, err := ipa.Inspect(filename)
 	if err != nil {
@@ -120,6 +118,16 @@ func BootstrapLoader(ctx context.Context, client *apple.Client, session *apple.S
 	notify(1, result.CompletionMessage)
 	return result, nil
 }
+func loaderIPAForAccount(freeIPA string, paid bool) (string, error) {
+	if !paid {
+		return freeIPA, nil
+	}
+	filename := filepath.Join(filepath.Dir(freeIPA), "IPA-Loader-Paid-Accounts.ipa")
+	if st, err := os.Stat(filename); err != nil || !st.Mode().IsRegular() {
+		return "", errors.New("The paid-account iOS package is missing: include IPA-Loader-Paid-Accounts.ipa with this desktop release")
+	}
+	return filename, nil
+}
 func bootstrapTransferError(err error) error {
 	return errors.Join(errors.New("IPA Loader was installed, but setup transfer did not finish. Keep it closed and retry Install IPA Loader"), err)
 }
@@ -134,10 +142,10 @@ func LoaderIPAPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, p := range []string{filepath.Join(root, "ios", "IPA-Loader.ipa"), filepath.Join("build", "ios", "IPA-Loader.ipa")} {
+	for _, p := range []string{filepath.Join(root, "ios", "IPA-Loader-Free-Accounts.ipa"), filepath.Join("build", "ios", "IPA-Loader-Free-Accounts.ipa")} {
 		if stat, err := os.Stat(p); err == nil && stat.Mode().IsRegular() {
 			return filepath.Abs(p)
 		}
 	}
-	return "", errors.New("The iOS package is missing. Build it on macOS with just ios, then include ios/IPA-Loader.ipa with this desktop release")
+	return "", errors.New("The iOS package is missing. Build it on macOS with just ios, then include ios/IPA-Loader-Free-Accounts.ipa with this desktop release")
 }

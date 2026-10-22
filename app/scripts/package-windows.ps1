@@ -62,7 +62,7 @@ try {
     if ($Linker) { $sharingArgs.Linker = $Linker }
     & (Join-Path $PSScriptRoot 'build-sharing-windows.ps1') @sharingArgs
     $env:CGO_ENABLED = '0'
-    Copy-Runtime 'ios' @('IPA-Loader.ipa', 'IPA-Loader-VPN.ipa')
+    Copy-Runtime 'ios' @('IPA-Loader-Free-Accounts.ipa', 'IPA-Loader-Paid-Accounts.ipa')
     Copy-Runtime 'sharing-windows' @('IPALoaderSharingCompat-v1.dylib', 'manifest.json', 'LICENSE.fishhook', 'sources')
     Push-Location $appRoot
     try {
