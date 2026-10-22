@@ -8,10 +8,10 @@ run verification without signing credentials or Apple submissions.
 
 ## Shared macOS release Action
 
-The workflow calls the shared `dist-tools/actions/apple-release` Action at an
-immutable commit SHA. Signing, temporary keychains, notarization, ticket retries
-and ZIP packaging are maintained and tested there. Update the pinned reference
-in `.github/workflows/ci.yml` to adopt a reviewed version.
+The workflow uses `dist-tools/actions/apple-release@v1`, which tracks compatible
+v1 updates. Signing, temporary keychains, notarization, ticket retries and ZIP
+packaging are maintained there. Use a version tag or full commit SHA in
+`.github/workflows/ci.yml` to select a fixed release.
 
 IPA Loader supplies its bundle ID, app/output paths and post-sign runtime audit.
 The Action signs the outer app with hardened runtime and a timestamp without

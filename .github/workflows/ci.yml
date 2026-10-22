@@ -108,7 +108,7 @@ jobs:
       - name: Sign, notarize and staple macOS release
         if: github.event_name == 'push' && github.ref_type == 'tag'
         timeout-minutes: 30
-        uses: acheronfail/dist-tools/actions/apple-release@fae181a929fcabd1d699176b559e4d6414e18b76
+        uses: acheronfail/dist-tools/actions/apple-release@v1
         with:
           app-path: ${{ github.workspace }}/app/build/IPA Loader.app
           bundle-id: org.ipaloader.desktop
