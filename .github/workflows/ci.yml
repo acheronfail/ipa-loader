@@ -1,6 +1,12 @@
 name: Verify and release
 
 on:
+  workflow_dispatch:
+    inputs:
+      macos-signing-smoke:
+        description: Build, notarize and verify a downloaded macOS ZIP without creating a release
+        type: boolean
+        default: false
   push:
     branches: [master]
     # GitHub tag filters are globs; the verification job enforces exact SemVer.
@@ -18,6 +24,9 @@ jobs:
     name: Tests and verifications
     runs-on: macos-15
     timeout-minutes: 75
+    permissions:
+      contents: read
+      actions: read
     env:
       CGO_ENABLED: '1'
       # Go adds -lobjc for each Objective-C package linked into a test binary.
@@ -43,20 +52,38 @@ jobs:
           echo "IPA_LOADER_IOS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           echo "IPA_LOADER_IOS_BUILD=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
       - name: Check macOS release credentials
-        if: github.ref_type == 'tag'
+        if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
         env:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           APPLE_CODE_SIGN_P12_BASE64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
           APPLE_CODE_SIGN_P12_PASSWORD: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
           APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
           APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_NOTARY_AUTH_MODE: ${{ vars.APPLE_NOTARY_AUTH_MODE || 'apple-id' }}
+          APPLE_NOTARY_API_KEY: ${{ secrets.APPLE_NOTARY_API_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
         run: |
           : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID variable}"
           [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]
           : "${APPLE_CODE_SIGN_P12_BASE64:?Missing MACOS_CODE_SIGN_P12_BASE64 secret}"
           : "${APPLE_CODE_SIGN_P12_PASSWORD:?Missing MACOS_CODE_SIGN_P12_PASSWORD secret}"
-          : "${APPLE_NOTARY_APPLE_ID:?Missing APPLE_NOTARY_APPLE_ID secret}"
-          : "${APPLE_NOTARY_PASSWORD:?Missing APPLE_NOTARY_PASSWORD secret}"
+          case "$APPLE_NOTARY_AUTH_MODE" in
+            api-team)
+              : "${APPLE_NOTARY_API_KEY:?Missing APPLE_NOTARY_API_KEY secret}"
+              : "${APPLE_NOTARY_KEY_ID:?Missing APPLE_NOTARY_KEY_ID secret}"
+              : "${APPLE_NOTARY_ISSUER_ID:?Missing APPLE_NOTARY_ISSUER_ID secret}"
+              ;;
+            api-individual)
+              : "${APPLE_NOTARY_API_KEY:?Missing APPLE_NOTARY_API_KEY secret}"
+              : "${APPLE_NOTARY_KEY_ID:?Missing APPLE_NOTARY_KEY_ID secret}"
+              ;;
+            apple-id)
+              : "${APPLE_NOTARY_APPLE_ID:?Missing APPLE_NOTARY_APPLE_ID secret}"
+              : "${APPLE_NOTARY_PASSWORD:?Missing APPLE_NOTARY_PASSWORD secret}"
+              ;;
+            *) echo 'Unsupported notarization authentication mode.' >&2; exit 1 ;;
+          esac
       - uses: actions/setup-go@v7
         with:
           # Keep in sync with scripts/Dockerfile.linux-release.
@@ -67,16 +94,21 @@ jobs:
       - name: Verify committed IPA fixtures
         run: python3 ../scripts/verify_committed_fixtures.py
       - name: Test with race detector
+        if: github.event_name != 'workflow_dispatch' || !inputs.macos-signing-smoke
         run: go test -race -count=1 -tags ci ./...
       - name: Vet
+        if: github.event_name != 'workflow_dispatch' || !inputs.macos-signing-smoke
         run: go vet -tags ci ./...
       - name: Test native iOS UI and both VPN variants
+        if: github.event_name != 'workflow_dispatch' || !inputs.macos-signing-smoke
         timeout-minutes: 10
         run: sh scripts/test-ios-apps.sh
       - name: Test macOS signing and notarization failure handling
+        if: github.event_name != 'workflow_dispatch' || !inputs.macos-signing-smoke
         run: node --test ../scripts/macos-notarization.test.mjs
       - name: Build and audit macOS app and both iOS payloads
-        if: github.ref_type == 'tag'
+        id: macos
+        if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
         run: |
           go run ./cmd/release macos
           for ipa in build/ios/IPA-Loader-Free-Accounts.ipa build/ios/IPA-Loader-Paid-Accounts.ipa; do
@@ -85,27 +117,40 @@ jobs:
           done
           mkdir -p build/release-assets
           cp build/ios/IPA-Loader-Free-Accounts.ipa build/ios/IPA-Loader-Paid-Accounts.ipa build/release-assets/
-      # Same hosted-runner HTTP/3 workaround used by float-view-mobile.
-      # https://github.com/actions/runner-images/issues/14924
-      - name: Work around Apple ticket delivery networking
-        if: github.ref_type == 'tag'
-        run: |
-          echo "block return out quick proto udp from any to any port 443" | sudo pfctl -f -
-          sudo pfctl -E
+          echo "archive=$GITHUB_WORKSPACE/app/build/release-assets/IPA-Loader-macos-$(go env GOARCH).zip" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            python3 - <<'PYTHON'
+          import hashlib, json, pathlib, stat
+          app = pathlib.Path('build/IPA Loader.app')
+          resources = app / 'Contents/Resources'
+          manifest = {str(p.relative_to(resources)): {'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'mode': stat.S_IMODE(p.stat().st_mode)} for p in resources.rglob('*') if p.is_file()}
+          metadata = {'resources': manifest, 'executable_mode': stat.S_IMODE((app / 'Contents/MacOS/ipa-loader').stat().st_mode)}
+          pathlib.Path('build/release-assets/smoke-resource-manifest.json').write_text(json.dumps(metadata))
+          PYTHON
+          fi
       - name: Sign, notarize and staple macOS release
-        if: github.ref_type == 'tag'
+        if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
         timeout-minutes: 30
-        env:
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-          APPLE_CODE_SIGN_P12_BASE64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
-          APPLE_CODE_SIGN_P12_PASSWORD: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
-          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
-          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
-        run: |
-          bash scripts/with-apple-signing-identity.sh bash scripts/sign-and-notarize-macos.sh \
-            "build/IPA Loader.app" "build/release-assets/IPA-Loader-macos-$(go env GOARCH).zip"
+        uses: acheronfail/dist-tools/actions/apple-release@fae16608228264d72a2bd71c428798f7f12318e4
+        with:
+          app-path: ${{ github.workspace }}/app/build/IPA Loader.app
+          bundle-id: org.ipaloader.desktop
+          output-archive: ${{ steps.macos.outputs.archive }}
+          team-id: ${{ vars.APPLE_TEAM_ID }}
+          p12-base64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
+          p12-password: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
+          notary-auth-mode: ${{ vars.APPLE_NOTARY_AUTH_MODE || 'apple-id' }}
+          notary-api-key: ${{ (vars.APPLE_NOTARY_AUTH_MODE == 'api-team' || vars.APPLE_NOTARY_AUTH_MODE == 'api-individual') && secrets.APPLE_NOTARY_API_KEY || '' }}
+          notary-key-id: ${{ (vars.APPLE_NOTARY_AUTH_MODE == 'api-team' || vars.APPLE_NOTARY_AUTH_MODE == 'api-individual') && secrets.APPLE_NOTARY_KEY_ID || '' }}
+          notary-issuer-id: ${{ vars.APPLE_NOTARY_AUTH_MODE == 'api-team' && secrets.APPLE_NOTARY_ISSUER_ID || '' }}
+          notary-apple-id: ${{ (vars.APPLE_NOTARY_AUTH_MODE == 'apple-id' || vars.APPLE_NOTARY_AUTH_MODE == '') && secrets.APPLE_NOTARY_APPLE_ID || '' }}
+          notary-password: ${{ (vars.APPLE_NOTARY_AUTH_MODE == 'apple-id' || vars.APPLE_NOTARY_AUTH_MODE == '') && secrets.APPLE_NOTARY_PASSWORD || '' }}
+          ticket-network-workaround: 'true'
+          post-sign-command: >-
+            env PATH=/usr/bin:/bin DEVELOPER_DIR=/nonexistent
+            "$APPLE_RELEASE_APP/Contents/MacOS/ipa-loader" --check-runtime
       - name: Upload macOS and iOS assets
-        if: github.ref_type == 'tag'
+        if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
         uses: actions/upload-artifact@v7
         with:
           name: macos-and-ios
@@ -114,9 +159,54 @@ jobs:
           retention-days: 14
           overwrite: true
 
+  verify-smoke-download:
+    name: Verify downloaded notarized app
+    if: github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke
+    needs: verify
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Download and extract the uploaded ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name macos-and-ios --dir "$RUNNER_TEMP/download"
+          archives=("$RUNNER_TEMP/download"/IPA-Loader-macos-*.zip)
+          [[ "${#archives[@]}" == 1 && -f "${archives[0]}" ]]
+          unzip -tq "${archives[0]}"
+          ditto -x -k "${archives[0]}" "$RUNNER_TEMP/extracted"
+      - name: Verify resource bytes and executable modes after extraction
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib, json, os, pathlib, stat
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          metadata = json.loads((root / 'download/smoke-resource-manifest.json').read_text())
+          app = root / 'extracted/IPA Loader.app'
+          resources = app / 'Contents/Resources'
+          actual = {str(p.relative_to(resources)): {'sha256': hashlib.sha256(p.read_bytes()).hexdigest(), 'mode': stat.S_IMODE(p.stat().st_mode)} for p in resources.rglob('*') if p.is_file()}
+          assert actual == metadata['resources'], 'Embedded resources changed during signing or archive round-trip'
+          executable = app / 'Contents/MacOS/ipa-loader'
+          assert os.access(executable, os.X_OK), 'Extracted executable lost its execute permission'
+          assert stat.S_IMODE(executable.stat().st_mode) == metadata['executable_mode'], 'Executable modes changed'
+          print('Downloaded app preserves embedded resources and executable modes.')
+          PYTHON
+      - name: Verify signature, stapled ticket, Gatekeeper and runtime
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+        run: |
+          app="$RUNNER_TEMP/extracted/IPA Loader.app"
+          requirement="anchor apple generic and identifier \"org.ipaloader.desktop\" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"$APPLE_TEAM_ID\""
+          codesign --verify --deep --strict --test-requirement "=$requirement" "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute "$app"
+          env PATH=/usr/bin:/bin DEVELOPER_DIR=/nonexistent "$app/Contents/MacOS/ipa-loader" --check-runtime
+
   release:
     name: Build desktop releases and create draft
-    if: github.ref_type == 'tag'
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 90
