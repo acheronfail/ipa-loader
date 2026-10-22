@@ -17,7 +17,7 @@ jobs:
   verify:
     name: Tests and verifications
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
       CGO_ENABLED: '1'
       # Go adds -lobjc for each Objective-C package linked into a test binary.
@@ -42,6 +42,21 @@ jobs:
           fi
           echo "IPA_LOADER_IOS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           echo "IPA_LOADER_IOS_BUILD=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+      - name: Check macOS release credentials
+        if: github.ref_type == 'tag'
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_CODE_SIGN_P12_BASE64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
+          APPLE_CODE_SIGN_P12_PASSWORD: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: |
+          : "${APPLE_TEAM_ID:?Missing APPLE_TEAM_ID variable}"
+          [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]
+          : "${APPLE_CODE_SIGN_P12_BASE64:?Missing MACOS_CODE_SIGN_P12_BASE64 secret}"
+          : "${APPLE_CODE_SIGN_P12_PASSWORD:?Missing MACOS_CODE_SIGN_P12_PASSWORD secret}"
+          : "${APPLE_NOTARY_APPLE_ID:?Missing APPLE_NOTARY_APPLE_ID secret}"
+          : "${APPLE_NOTARY_PASSWORD:?Missing APPLE_NOTARY_PASSWORD secret}"
       - uses: actions/setup-go@v7
         with:
           # Keep in sync with scripts/Dockerfile.linux-release.
@@ -55,15 +70,33 @@ jobs:
         run: go test -race -count=1 -tags ci ./...
       - name: Vet
         run: go vet -tags ci ./...
+      - name: Test macOS signing and notarization failure handling
+        run: node --test ../scripts/macos-notarization.test.mjs
       - name: Build and audit macOS app and both iOS payloads
         if: github.ref_type == 'tag'
         run: |
           go run ./cmd/release macos
           mkdir -p build/release-assets
-          # Preserve the app bundle's executable modes and signature in transit.
-          ditto -c -k --sequesterRsrc --keepParent "build/IPA Loader.app" \
-            "build/release-assets/IPA-Loader-macos-$(go env GOARCH).zip"
           cp build/ios/IPA-Loader.ipa build/ios/IPA-Loader-VPN.ipa build/release-assets/
+      # Same hosted-runner HTTP/3 workaround used by float-view-mobile.
+      # https://github.com/actions/runner-images/issues/14924
+      - name: Work around Apple ticket delivery networking
+        if: github.ref_type == 'tag'
+        run: |
+          echo "block return out quick proto udp from any to any port 443" | sudo pfctl -f -
+          sudo pfctl -E
+      - name: Sign, notarize and staple macOS release
+        if: github.ref_type == 'tag'
+        timeout-minutes: 30
+        env:
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_CODE_SIGN_P12_BASE64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
+          APPLE_CODE_SIGN_P12_PASSWORD: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: |
+          bash scripts/with-apple-signing-identity.sh bash scripts/sign-and-notarize-macos.sh \
+            "build/IPA Loader.app" "build/release-assets/IPA-Loader-macos-$(go env GOARCH).zip"
       - name: Upload macOS and iOS assets
         if: github.ref_type == 'tag'
         uses: actions/upload-artifact@v7

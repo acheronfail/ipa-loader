@@ -19,6 +19,7 @@ Builds need Go and platform toolchains: Xcode on macOS, Zig and a Darwin-capable
 LLVM linker for Windows cross-builds, and Docker for Linux builds from macOS.
 Linux/Windows packages require the iOS payloads built on macOS.
 See [the iOS guide](IOS.md) for setup and refresh.
+See [the release guide](RELEASING.md) for CI signing, notarization and credentials.
 
 Signing supports arm64/arm64e iPhone apps, frameworks, dylibs and basic extensions.
 Sharing-adapter injection requires thin arm64 images. Encrypted binaries,
