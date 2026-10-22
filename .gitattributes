@@ -1,0 +1,8 @@
+# Keep scripts, source and patch bytes stable across macOS and Windows checkouts.
+* text=auto eol=lf
+
+# Preserve upstream vendor text verbatim.
+app/internal/platform/compat/fishhook.[ch] -whitespace
+
+# Reviewed prebuilt iOS test archives must retain their exact bytes.
+fixtures/ipas/*.ipa binary

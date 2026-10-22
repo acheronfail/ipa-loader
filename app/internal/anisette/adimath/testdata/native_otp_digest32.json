@@ -1,0 +1,141 @@
+{
+  "scope": "Eight arbitrary32-byte synthetic inputs; immutable initialization proven by native literal MOV/MOVK producers.",
+  "vectors": [
+    {
+      "input_hex": "338ab1ea3ef4cc63187751fdaaec23380ad02a22e17343e0c6fc98d503576d20",
+      "output_hex": "d74902afa15757ce7f5d003dc4f5b522dadae258e23085942ed824c5c7c62ea5",
+      "serialized_hex": "029eaae2d1bd1fdd67376cf728ccfd4541194a85804acd58646d48c4253466d6029eaae2d1bd1fdd67376cf728ccfd4541194a85804acd58646d48c4253466d6",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "eefd231e8681b73e0b94be77dc4e34781ccaf5ec881f0158161f856de6728b21",
+      "output_hex": "9732920185447a7374313df87960190c1bdbde352dfb8596aa8c3b2ebaa6d2da",
+      "serialized_hex": "734dda165e2c7e918f153fa863361db9db9b96a98018812c4cf0396eefe0d650734dda165e2c7e918f153fa863361db9db9b96a98018812c4cf0396eefe0d650",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "b436808562a2889fbdd0b41c61cc5e3dc52d9e6a73cdb810de02bcaa51fdf767",
+      "output_hex": "0f3c34b7749021f358391264c2086519b3ccba600dc5f143d2b1ef9224d6582a",
+      "serialized_hex": "f9e0284a12e6b3894fd07da4cfc8f71680d3a61f98316301a960807a733ecae6f9e0284a12e6b3894fd07da4cfc8f71680d3a61f98316301a960807a733ecae6",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "fe746d4646a4468d75ef5401ef4100e3ded89bffd17bd854b1de6e27dfa5e4c0",
+      "output_hex": "ae3733fe6fcaea0cd3d30d2ef624d04054563bedb259733d680d3321e8b4595e",
+      "serialized_hex": "c94da8528441798d5040a028420643781453a0c13f52e0534e719eb8b809ca19c94da8528441798d5040a028420643781453a0c13f52e0534e719eb8b809ca19",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "628245500672ef6df93fe5b5f1604e8ff56127a4067fb1d8b5b62ec086dc7ec9",
+      "output_hex": "126bff6d5049c7a12a99398bf62723d8a57169af6948474dac6558f381e8a5bf",
+      "serialized_hex": "aadade52f75570630c94eff349b2945093bd48537197f09f7b788e3cfeca124aaadade52f75570630c94eff349b2945093bd48537197f09f7b788e3cfeca124a",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "e18643ac0b8801fe125b05005a67e15d450f7c0eb4920fbe74729dc2ea46b366",
+      "output_hex": "c3d563362a746581b5335673a39e003b80f617e1a40de6182d5b1eb31a2ac1b2",
+      "serialized_hex": "63503ccabc0b4e0fea07353452972bbeedd948b324dccd67539e7d801157ea9d63503ccabc0b4e0fea07353452972bbeedd948b324dccd67539e7d801157ea9d",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "e70bfe8ef0e5fc5d0b094cb78d8f06b72e4e8f41ea7b7ba6dbceb019ce4c7d04",
+      "output_hex": "43ddd24903c84ae0c52e9c4c29d8e8b21dfa7b4324076674be57b849aea40295",
+      "serialized_hex": "141b2fc6c5f01e803ef9ec3e38aebc70333c8609befa32f9b96dc84266ab5657141b2fc6c5f01e803ef9ec3e38aebc70333c8609befa32f9b96dc84266ab5657",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    },
+    {
+      "input_hex": "20d7a1270d78bf7c3c64492528ad822d12bcc1aa362e59d886ea4f86fabeb78a",
+      "output_hex": "de2d108e867a67127cda5cfceecf14bb30e3972daa11d678e68ea290093d2bd8",
+      "serialized_hex": "d101dae29bc12a0db98cef51a32c597afd625d8901629b595ee611a34d4066b4d101dae29bc12a0db98cef51a32c597afd625d8901629b595ee611a34d4066b4",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ]
+    }
+  ]
+}

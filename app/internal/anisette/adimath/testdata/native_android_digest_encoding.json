@@ -1,0 +1,37 @@
+{
+  "scope": "Every semantic16-byte input independently overwritten; fixed initial loop counter is an immediate MOV/MOVK value.",
+  "vectors": [
+    {
+      "input_hex": "5396b25e4eb02815138d6b8cbde68845",
+      "output_hex": "fcc6e30c1de47d4344d532d6e6bad51b"
+    },
+    {
+      "input_hex": "dc3c1c61d93a7ae808f8fbadb638d57b",
+      "output_hex": "736c4d338a6e2fbe5fa0a2f7ed648825"
+    },
+    {
+      "input_hex": "8e8627d97713096052c1e91d1d36af9e",
+      "output_hex": "21d6768b24475c360599b047466af2c0"
+    },
+    {
+      "input_hex": "24cf0371bb81a3770a382ebbba061ff0",
+      "output_hex": "8b9f5223e8d5f6215d6077e1e15a42ae"
+    },
+    {
+      "input_hex": "efce1f6e14dd666055032978bf8b31dd",
+      "output_hex": "409e4e3c47893336025b7022e4d76c83"
+    },
+    {
+      "input_hex": "367bb6206d3fac836fd1d5136f6503c8",
+      "output_hex": "992be7723e6bf9d538898c4934395e96"
+    },
+    {
+      "input_hex": "1b57df82789fd71683f9c7b5d5d3e161",
+      "output_hex": "b4078ed02bcb8240d4a19eef8e8fbc3f"
+    },
+    {
+      "input_hex": "90ab127751ed9822d59e01cb6d90f051",
+      "output_hex": "3ffb432502b9cd7482c6589136ccad0f"
+    }
+  ]
+}

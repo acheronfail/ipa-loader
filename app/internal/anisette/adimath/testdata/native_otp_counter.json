@@ -1,0 +1,65 @@
+{
+  "scope": "Synthetic clock and disposable offline identity; stops at counter serialization before55-byte transform.",
+  "vectors": [
+    {
+      "counter": 0,
+      "encoded8_hex": "3c3c3c3c3c3c3c3c",
+      "decoded8_hex": "0000000000000000"
+    },
+    {
+      "counter": 1,
+      "encoded8_hex": "3c3d3c3d3c3d3c3d",
+      "decoded8_hex": "0001000100010001"
+    },
+    {
+      "counter": 255,
+      "encoded8_hex": "3cc33cc33cc33cc3",
+      "decoded8_hex": "00ff00ff00ff00ff"
+    },
+    {
+      "counter": 256,
+      "encoded8_hex": "3d3c3d3c3d3c3d3c",
+      "decoded8_hex": "0100010001000100"
+    },
+    {
+      "counter": 65535,
+      "encoded8_hex": "c3c3c3c3c3c3c3c3",
+      "decoded8_hex": "ffffffffffffffff"
+    },
+    {
+      "counter": 65536,
+      "encoded8_hex": "3c3c3c3c3c3c3c3c",
+      "decoded8_hex": "0000000000000000"
+    },
+    {
+      "counter": 60000000,
+      "encoded8_hex": "bb3cbb3cbb3cbb3c",
+      "decoded8_hex": "8700870087008700"
+    },
+    {
+      "counter": 60000001,
+      "encoded8_hex": "bb3dbb3dbb3dbb3d",
+      "decoded8_hex": "8701870187018701"
+    },
+    {
+      "counter": 60000256,
+      "encoded8_hex": "b43cb43cb43cb43c",
+      "decoded8_hex": "8800880088008800"
+    },
+    {
+      "counter": 305419896,
+      "encoded8_hex": "6a446a44df206a44",
+      "decoded8_hex": "56785678e31c5678"
+    },
+    {
+      "counter": 2147483647,
+      "encoded8_hex": "5d21c3c3a2f1b88d",
+      "decoded8_hex": "611dffff9ecd84b1"
+    },
+    {
+      "counter": 4294967295,
+      "encoded8_hex": "fe07785a1cf8355f",
+      "decoded8_hex": "c23b446620c40963"
+    }
+  ]
+}

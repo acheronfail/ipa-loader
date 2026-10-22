@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "artifact_sha256": "9d5b557cf3faf88c34c394ab2cd7fc1a3b4acf3aed51f28cd0bc093858107c22",
+  "scope": "Synthetic 16-byte client identities with fixed emulator clock, RNG and virtual filesystem.",
+  "vectors": [
+    {
+      "identity": "30313233343536373839616263646566",
+      "preimage": "877a55d6d923b93e82e1dcc82b5a3c278536",
+      "preimage_length": 18,
+      "digest": "c9f365aa986aed1afd4c2ffc26a5ff128d915026"
+    },
+    {
+      "identity": "30313233343536373839616263646567",
+      "preimage": "9317bb720a5260636f9dbf8083266844d5c1",
+      "preimage_length": 18,
+      "digest": "71e63b34f38b8e9bd0eca3183a80d0fe2fe28588"
+    },
+    {
+      "identity": "00000000000000000000000000000000",
+      "preimage": "c1c7998b986b7e4659c5fd02ccb875869e9e",
+      "preimage_length": 18,
+      "digest": "d34517a4db9c638576b176400d1a8a15022c98a5"
+    },
+    {
+      "identity": "13385d82a7ccf1163b6085aacff4193e",
+      "preimage": "fa94fbd22457f29eaedcde69ab16596ba944",
+      "preimage_length": 18,
+      "digest": "9aa539725def32a49f6efc691881b7ba256fa2f0"
+    }
+  ]
+}

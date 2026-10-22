@@ -1,0 +1,12 @@
+# Official Go 1.26.2 Debian trixie multi-platform manifest, pinned for repeatability.
+FROM golang:1.26.2-trixie@sha256:4a7137ea573f79c86ae451ff05817ed762ef5597fcf732259e97abeb3108d873
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl python3 make g++ git pkg-config \
+    libgl-dev libglx-dev libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev \
+    libxi-dev libxxf86vm-dev libwayland-dev libxkbcommon-dev libegl-dev libffi-dev lld \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -o /tmp/zig.tar.xz \
+    && echo '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  /tmp/zig.tar.xz' | sha256sum -c - \
+    && mkdir /opt/zig && tar -xJf /tmp/zig.tar.xz --strip-components=1 -C /opt/zig \
+    && rm /tmp/zig.tar.xz
+ENV PATH="/opt/zig:${PATH}"

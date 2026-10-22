@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "artifact_sha256": "c193f8e010b4693bc064632a63a994bc718afa59ec238afd79bb682fd19bbe45",
+  "operation": "challenge-derived fixed 16-byte block transformation",
+  "native_range": [
+    "0x1000ffcfc",
+    "0x10010352c"
+  ],
+  "constructor": "all sixteen representation-initialization bytes forced zero; actual block restored afterward",
+  "vectors": [
+    {
+      "input": "00000000000000000000000000000000",
+      "output": "3d58ef3eadd68c7712a759a868267ca6",
+      "instructions": 3596
+    },
+    {
+      "input": "ffffffffffffffffffffffffffffffff",
+      "output": "f9d898267389470cd8f748e7daf03744",
+      "instructions": 3596
+    },
+    {
+      "input": "000102030405060708090a0b0c0d0e0f",
+      "output": "fdb5cdf97824a080db8cabef3cbcc24c",
+      "instructions": 3596
+    },
+    {
+      "input": "135ca5ee3780c9125ba4ed367fc8115a",
+      "output": "92200ebdf587dff8d107c3a1a10f6c3d",
+      "instructions": 3596
+    },
+    {
+      "input": "3972c615c078c4283e07697b607dcec4",
+      "output": "37d5cb85f7e190819ed443a29479682a",
+      "instructions": 3596
+    },
+    {
+      "input": "9e84cda2c9914a96b1a77df4218aa5c4",
+      "output": "37eb420ba376cb606c96fc8a0471522a",
+      "instructions": 3596
+    },
+    {
+      "input": "a418289012268d9d570ad0e50853fc1c",
+      "output": "ef35a15fe49268d6207f7a6a765c9468",
+      "instructions": 3596
+    },
+    {
+      "input": "4d215cfba428e41efff45417aaacc73d",
+      "output": "89bbdbb78b6fa90d772fd96a7765848e",
+      "instructions": 3596
+    },
+    {
+      "input": "b4d0626023aa7c6ab34bcacf54ddeaa0",
+      "output": "4883f3600272e618ac28d27f9dc5e796",
+      "instructions": 3596
+    },
+    {
+      "input": "5ac0441fa774b5cc6b0a4d0087a80a1a",
+      "output": "66bdc48d32653530fbf92835957987be",
+      "instructions": 3596
+    },
+    {
+      "input": "96dabc86242e6eadc8a1143d09407d28",
+      "output": "123bbc2e43f3e1975a7a1f9325e52e80",
+      "instructions": 3596
+    },
+    {
+      "input": "4cecf03d0d43b8c1479f4064ac6acd64",
+      "output": "9ec53dff1db3c2b8e6d5b43618bd749c",
+      "instructions": 3596
+    },
+    {
+      "input": "ab37dfa868f6a66f7c9e00d2bfb34411",
+      "output": "5116b91631a4dfaa5ecd77d00e5139b9",
+      "instructions": 3596
+    },
+    {
+      "input": "99878485831f65cac989fcff798e5762",
+      "output": "a43e67c268b6c8cdf3cc848260cd3317",
+      "instructions": 3596
+    },
+    {
+      "input": "c6a86b392c3fdc578e73c397ef0a301a",
+      "output": "3cc18a31f5962d1a0af2dab47e62a442",
+      "instructions": 3596
+    },
+    {
+      "input": "40bb30b8ce073aa278b5273181533784",
+      "output": "03a6bea3eb65dde60a0478ae3fea7577",
+      "instructions": 3596
+    }
+  ],
+  "limitations": [
+    "Offline ARM emulation with PAC omitted.",
+    "Does not identify a standard cipher or complete ADI provisioning."
+  ]
+}

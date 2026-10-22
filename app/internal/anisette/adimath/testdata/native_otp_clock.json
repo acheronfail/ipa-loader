@@ -1,0 +1,100 @@
+{
+  "scope": "Synthetic signed int64 clock seconds; counter captured at native122d98 before identity/key processing.",
+  "vectors": [
+    {
+      "unix_seconds": -1800000000,
+      "counter": 4234967296,
+      "native_biased_word": 357591996
+    },
+    {
+      "unix_seconds": -61,
+      "counter": 4294967294,
+      "native_biased_word": 417591994
+    },
+    {
+      "unix_seconds": -60,
+      "counter": 4294967294,
+      "native_biased_word": 417591994
+    },
+    {
+      "unix_seconds": -59,
+      "counter": 4294967295,
+      "native_biased_word": 417591995
+    },
+    {
+      "unix_seconds": -31,
+      "counter": 4294967295,
+      "native_biased_word": 417591995
+    },
+    {
+      "unix_seconds": -30,
+      "counter": 4294967295,
+      "native_biased_word": 417591995
+    },
+    {
+      "unix_seconds": -29,
+      "counter": 0,
+      "native_biased_word": 417591996
+    },
+    {
+      "unix_seconds": -1,
+      "counter": 0,
+      "native_biased_word": 417591996
+    },
+    {
+      "unix_seconds": 0,
+      "counter": 0,
+      "native_biased_word": 417591996
+    },
+    {
+      "unix_seconds": 1,
+      "counter": 0,
+      "native_biased_word": 417591996
+    },
+    {
+      "unix_seconds": 29,
+      "counter": 0,
+      "native_biased_word": 417591996
+    },
+    {
+      "unix_seconds": 30,
+      "counter": 1,
+      "native_biased_word": 417591997
+    },
+    {
+      "unix_seconds": 31,
+      "counter": 1,
+      "native_biased_word": 417591997
+    },
+    {
+      "unix_seconds": 59,
+      "counter": 1,
+      "native_biased_word": 417591997
+    },
+    {
+      "unix_seconds": 60,
+      "counter": 2,
+      "native_biased_word": 417591998
+    },
+    {
+      "unix_seconds": 61,
+      "counter": 2,
+      "native_biased_word": 417591998
+    },
+    {
+      "unix_seconds": 1800000000,
+      "counter": 60000000,
+      "native_biased_word": 477591996
+    },
+    {
+      "unix_seconds": 9223372036854775807,
+      "counter": 1145324612,
+      "native_biased_word": 1562916608
+    },
+    {
+      "unix_seconds": -9223372036854775808,
+      "counter": 3149642684,
+      "native_biased_word": 3567234680
+    }
+  ]
+}

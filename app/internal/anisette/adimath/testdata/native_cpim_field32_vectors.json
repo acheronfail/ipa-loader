@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "artifact_sha256": "c193f8e010b4693bc064632a63a994bc718afa59ec238afd79bb682fd19bbe45",
+  "operation": "Semantic32-byte CPIM field transform, nativehelper24aeb4",
+  "native_round_range": [
+    "0x10024fbf8",
+    "0x1002520e0"
+  ],
+  "native_feedback_range": [
+    "0x100252140",
+    "0x100252178"
+  ],
+  "vectors": [
+    {
+      "input": "0000000000000000000000000000000000000000000000000000000000000000",
+      "output": "2f6bff000974cba3e59d6f91760c12e45661981d44d09be706b81eac316e7be0"
+    },
+    {
+      "input": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "output": "b5cac38e241ebcfba340c83c04c304c5e2c21a284d3e4d9e110852d0270672b6"
+    },
+    {
+      "input": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "output": "b594179e3bb16cf0b0e6bf38d109f73f8114f3dc11d03250dce4663569e849db"
+    },
+    {
+      "input": "135ca5ee3780c9125ba4ed367fc8115aa3ec357ec71059a2eb347dc60f58a1ea",
+      "output": "ef1aa7cfac11e72c7e0dd3504b0ab493cfc3fae9044932b45f229589f0d67ad2"
+    },
+    {
+      "input": "6dbb5a61befaf1227687c943692517308cad1e8ee6331e37030e860c26f64fa0",
+      "output": "eb6a65dc5ccf8909e25c3cf729ace5ffabf9cc522ec30444d332e691c2036489"
+    },
+    {
+      "input": "4aee3e5e23001f00418f442ceb728dbd992bebc942f048800194e80d0f81d9a4",
+      "output": "bfb81f103918229dde9b6f9f0e4e361038910a98cd48719cd97292121e564aa5"
+    },
+    {
+      "input": "e2c9adff373489a1c01f749a766d036610ee482cd39a269f00052a44e9fc5559",
+      "output": "ccac0484da03acc75659c5ea2d30f09bc2ae9e2efd7e2bfe67d1a5d45b39a996"
+    },
+    {
+      "input": "717b1d57b678af370d67be2d4d1bceab64bd089afa2f69fa89b441d18a240df2",
+      "output": "2f22f4a41fccc9bb90db78fb6890aaa9c80e588b3d6e92b24643ada443f88658"
+    },
+    {
+      "input": "b4cc3bca038851258431b4e4286a4030a208b15831efaca5f431c4bd5e037471",
+      "output": "dc7dc9996d6824e24f5f38a36102e28fac80c059b8f7458938e0dd7ff01ecc47"
+    },
+    {
+      "input": "5b433f4507dbf3150a851028e7062d243199baa72d1a674ab925b683f09c9d22",
+      "output": "7de82a3b8f6fff2d29aae0d01ae0adfa21f841df2244d9519c577cca4c8b58de"
+    },
+    {
+      "input": "7909d27d812c7d68c188e1dbf6d2314ce40dc8751b42494edd415fe137c9dfa9",
+      "output": "09decc14f114a03f2951cad0f3404da5c4735d2bd50a2e5e3f096b3e85806467"
+    },
+    {
+      "input": "d9208859b5cad7fadd14061e2391207c2c5603ae92ddc2d199dfd4d106e5d2ae",
+      "output": "dcf4f5eb7498c3308d01fbfb5cb58069cec4762902a34aa87bf378bf449e260f"
+    },
+    {
+      "input": "050ed9cf296f86c2af5933bd0a3bfbd953f3930d7841ecb71bc85737b65f0770",
+      "output": "4195cd80c51df2a82fdfa48582a741a53f3b37a56d2c426667f35ab8b8169381"
+    },
+    {
+      "input": "0300ac60518f9e012091c5fe15c87d146119d9e077acab98d11712236adc3922",
+      "output": "b640f4359eac878f072970526a0e8e5894b40072fb869a5ad8b75e84216210e5"
+    },
+    {
+      "input": "9dc2dae59cf7bd5b30e6d74a50e8abf01b1c2dca2c72917d654e6a2f89e8090f",
+      "output": "994a14d2b312b51d88e746551723446bb1dc119a6c6d05f48d4735fde785a0f1"
+    },
+    {
+      "input": "c529d20f1a884d78d6a7f24aaf0d39e149443b1ae2a084cb81e22fe6d7fe97f3",
+      "output": "e1c46f94ff5bdfcba58cdc38ad56af9b19d4d61175b451668630e9f18c4ecdd8"
+    }
+  ],
+  "limitations": [
+    "Semantic inputs are encoded only for their temporary native source location before emulation; portable API has no address input.",
+    "Constructor representation absorbs zero input; actual encoded semantic data is restored before rounds.",
+    "Offline ARM emulation with synthetic OS services and omitted PAC; no network or host state."
+  ]
+}

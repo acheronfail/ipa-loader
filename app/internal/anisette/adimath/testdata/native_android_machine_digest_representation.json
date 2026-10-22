@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "scope": "Eight synthetic 20-byte hash inputs; native encoder, input-dependent banks, body and complete semantic MID serialization executed offline.",
+  "normalization_xor16": "a12991fdc48f10fa2ad8b8d663944f9a",
+  "vectors": [
+    {
+      "sha1_hex": "338ab1ea3ef4cc63187751fdaaec23380ad02a22",
+      "encoded16_hex": "34cc342e3db64da31739dc31a1a6aaf0",
+      "raw_body16_hex": "c67dcbb1c10058dd2aefdffab4c398a9",
+      "mid20_hex": "67545a4c058f48270037672cd757d7330ad02a22"
+    },
+    {
+      "sha1_hex": "eefd231e8681b73e0b94be77dc4e34781ccaf5ec",
+      "encoded16_hex": "e9bba6da85c336fe04da33bbd704bdb0",
+      "raw_body16_hex": "b603ac5634b2e02657365f55664ea607",
+      "mid20_hex": "172a3dabf03df0dc7deee78305dae99d1ccaf5ec"
+    },
+    {
+      "sha1_hex": "b436808562a2889fbdd0b41c61cc5e3dc52d9e6a",
+      "encoded16_hex": "b370054161e0095fb29e39d06a86d7f5",
+      "raw_body16_hex": "1a0a1b343f0330fef7f90e8053123f91",
+      "mid20_hex": "bb238ac9fb8c2004dd21b6563086700bc52d9e6a"
+    },
+    {
+      "sha1_hex": "fe746d4646a4468d75ef5401ef4100e3ded89bff",
+      "encoded16_hex": "f932e88245e6c74d7aa1d9cde40b892b",
+      "raw_body16_hex": "e3c7275ebbe72122ebd94872e4b09e2c",
+      "mid20_hex": "42eeb6a37f6831d8c101f0a48724d1b6ded89bff"
+    },
+    {
+      "sha1_hex": "628245500672ef6df93fe5b5f1604e8ff56127a4",
+      "encoded16_hex": "65c4c09405306eadf6716879fa2ac747",
+      "raw_body16_hex": "8d334d35e5fc35c53e53c33312d3ba3a",
+      "mid20_hex": "2c1adcc82173253f148b7be57147f5a0f56127a4"
+    },
+    {
+      "sha1_hex": "e18643ac0b8801fe125b05005a67e15d450f7c0e",
+      "encoded16_hex": "e6c0c66808ca803e1d1588cc512d6895",
+      "raw_body16_hex": "fb8d0797a25e74737e5fe80e7f4fcba9",
+      "mid20_hex": "5aa4966a66d16489548750d81cdb8433450f7c0e"
+    },
+    {
+      "sha1_hex": "e70bfe8ef0e5fc5d0b094cb78d8f06b72e4e8f41",
+      "encoded16_hex": "e04d7b4af3a77d9d0447c17b86c58f7f",
+      "raw_body16_hex": "dd06d0b4a16bd7c9a9e18eb202179ded",
+      "mid20_hex": "7c2f414965e4c733833936646183d2772e4e8f41"
+    },
+    {
+      "sha1_hex": "20d7a1270d78bf7c3c64492528ad822d12bcc1aa",
+      "encoded16_hex": "279124e30e3a3ebc332ac4e923e70be5",
+      "raw_body16_hex": "9bf8a7ed5c395b5a5996025ce52541b1",
+      "mid20_hex": "3ad1361098b64ba0734eba8a86b10e2b12bcc1aa"
+    }
+  ]
+}

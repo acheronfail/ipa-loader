@@ -1,0 +1,29 @@
+{
+  "scope": "Synthetic 32-byte local keys and timestamps; normalized key and complete 96-byte pre-expansion output.",
+  "vectors": [
+    {
+      "seed": 87231,
+      "unix_seconds": 1800000000,
+      "normalized_prekey32_hex": "ad635d5e0b057121ae89b928c85346f3b37895fe9d147e775cbbe090c419de9a",
+      "input96_hex": "323b9f1f53b32b4a44b3173457f75a964a4a6eba5eddf553b04a8ac7bc6693b58946dc6aae280535831203b77cd41a680b80c531dee7bf25c80218dc7f0a95957306994efc99de01e5187014388ecc97254d59abce0966ba40e57084c2314d64"
+    },
+    {
+      "seed": 87232,
+      "unix_seconds": 1800000030,
+      "normalized_prekey32_hex": "7014cfaab3700a7cbd6a56a2bef151b3a5624a30f4783ccf8c58fd28213c389b",
+      "input96_hex": "6de6877220cfdf6fae2ecebadcebc7feca688add3caac78f50fe4722a60ee7cd81b57f5ce4292699330c5eea9cef96dac6be6694dd5393e88fb852069e62f2b188a8e6de229901f392227886ad2881cf5d5836a15811b11b149a094c24c0eb1a"
+    },
+    {
+      "seed": 87233,
+      "unix_seconds": 29,
+      "normalized_prekey32_hex": "2adf6c31575335dd0b2e5cc903733bf67c8521b60faa85874445c4ef96b344dd",
+      "input96_hex": "bec90529290e60c3baf638eb88793c7eb1e124708ee1f6ce142278a622fc7497806296e70f1f87b9223fd13988dcbe71618e3a2b0905ecef5b9845a0f89a91466965960b261c40edb26f7a15622e52f2c1c2e351b4a495438316cc08adaa2e6d"
+    },
+    {
+      "seed": 87234,
+      "unix_seconds": -31,
+      "normalized_prekey32_hex": "609d81f27355fbcfc311bcd48dfe652867702423ad1ce5c32b99166218eb577a",
+      "input96_hex": "63f6dee66acc9dc02f72fee5dacd9a748234c0eadb13f1a8b0b1359353958c1b6f488e98dabf29eddbff6bf31191adfc5d0e810ca5276686e26a620e23db87c6771bd86c5b915f2587e3778fd868727a814df4cd22a3e40458d1aeb673d04848"
+    }
+  ]
+}

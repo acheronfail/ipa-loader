@@ -1,0 +1,17 @@
+{
+  "scope": "Synthetic input only; ARM message-schedule substitution followed by original SHA256 compression and digest serialization",
+  "vectors": [
+    {
+      "ciphertext_hex": "135ca5ee3780c9125ba4ed367fc8115aa3ec357ec71059a2eb347dc60f58a1ea337cc50e57a0e9327bc40d569fe8317ac30c559ee73079c20b549de62f78c10a539ce52e77c009529be42d76bf08519ae32c75be075099e22b74bd064f98e12a73bc054e97e02972bb044d96df2871ba034c95de2770b9024b94dd266fb8014a93dc256eb7004992db246db6ff4891da236cb5fe4790d9226bb4fd468fd8216a",
+      "challenge_block_hex": "00112233445566778899aabbccddeeff",
+      "digest_hex": "4344ed9cc1742d3b9d128b88234f228cc2cd10c638f9514d800745ebd0ac9262",
+      "native_instructions": 2223252
+    },
+    {
+      "ciphertext_hex": "6eb7004992db246db6ff4891da236cb5fe4790d9226bb4fd468fd8216ab3fc458ed72069b2fb448dd61f68b1fa438cd51e67b0f9428bd41d66aff8418ad31c65aef74089d21b64adf63f88d11a63acf53e87d01962abf43d86cf1861aaf33c85ce1760a9f23b84cd165fa8f13a83cc155ea7f03982cb145da6ef3881ca135ca5ee3780c9125ba4ed367fc8115aa3ec357ec71059a2eb347dc60f58a1ea337cc5",
+      "challenge_block_hex": "35465768798a9bacbdcedff001122334",
+      "digest_hex": "f8d20ed94a2cdf3498af9990a8f16f49f414f707a6d35f2a7642349388bb1f6f",
+      "native_instructions": 2223252
+    }
+  ]
+}

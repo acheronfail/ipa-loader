@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/Foundation.framework/Foundation'
+exports:
+  - targets: [ arm64-ios ]
+    objc-classes: [ NSBundle, NSDictionary, NSFileManager, NSString, NSUserDefaults ]
+...

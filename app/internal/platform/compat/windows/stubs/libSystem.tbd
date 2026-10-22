@@ -1,0 +1,12 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libSystem.B.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ '_dladdr', '_dlsym', '_free', '_malloc', '_memcpy', '_strcmp',
+      '_vm_protect', '_mach_task_self_', '__dyld_get_image_header',
+      '__dyld_get_image_vmaddr_slide', '__dyld_image_count',
+      '__dyld_register_func_for_add_image', '___stack_chk_guard',
+      '___stack_chk_fail', '___memcpy_chk', 'dyld_stub_binder' ]
+...

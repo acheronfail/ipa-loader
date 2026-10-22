@@ -1,0 +1,140 @@
+name: Verify and release
+
+on:
+  push:
+    branches: [master]
+    # GitHub tag filters are globs; the verification job enforces exact SemVer.
+    tags: ['v[0-9]*.[0-9]*.[0-9]*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Tests and verifications
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      CGO_ENABLED: '1'
+      GOMODCACHE: ${{ github.workspace }}/app/.cache/gomod
+      GOCACHE: ${{ github.workspace }}/app/.cache/build
+      GOPATH: ${{ github.workspace }}/app/.cache/gopath
+    defaults:
+      run:
+        shell: bash
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate release tag
+        if: github.ref_type == 'tag'
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Release tags must be vX.Y.Z without leading zeroes or prerelease suffixes.' >&2
+            exit 1
+          fi
+          echo "IPA_LOADER_IOS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "IPA_LOADER_IOS_BUILD=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v7
+        with:
+          # Keep in sync with scripts/Dockerfile.linux-release.
+          go-version: '1.26.2'
+          cache-dependency-path: app/go.sum
+      - name: Verify module checksums
+        run: go mod verify
+      - name: Verify committed IPA fixtures
+        run: python3 ../scripts/verify_committed_fixtures.py
+      - name: Test with race detector
+        run: go test -race -count=1 -tags ci ./...
+      - name: Vet
+        run: go vet -tags ci ./...
+      - name: Build and audit macOS app and both iOS payloads
+        if: github.ref_type == 'tag'
+        run: |
+          go run ./cmd/release macos
+          mkdir -p build/release-assets
+          # Preserve the app bundle's executable modes and signature in transit.
+          ditto -c -k --sequesterRsrc --keepParent "build/IPA Loader.app" \
+            "build/release-assets/IPA-Loader-macos-$(go env GOARCH).zip"
+          cp build/ios/IPA-Loader.ipa build/ios/IPA-Loader-VPN.ipa build/release-assets/
+      - name: Upload macOS and iOS assets
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-and-ios
+          path: app/build/release-assets/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+
+  release:
+    name: Build desktop releases and create draft
+    if: github.ref_type == 'tag'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos-and-ios
+          path: release-assets
+      - name: Supply the same iOS payloads to Linux and Windows
+        run: |
+          mkdir -p app/build/ios
+          cp release-assets/IPA-Loader.ipa release-assets/IPA-Loader-VPN.ipa app/build/ios/
+      - name: Build pinned Linux and Windows toolchain
+        run: docker build --platform linux/amd64 -f app/scripts/Dockerfile.linux-release -t ipa-loader-release app/scripts
+      - name: Test Linux and build and audit Linux and Windows packages
+        run: |
+          docker run --rm --platform linux/amd64 --user "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/src" --workdir /src/app \
+            --env GOMODCACHE=/src/app/.cache/gomod \
+            --env GOCACHE=/src/app/.cache/build \
+            --env GOPATH=/src/app/.cache/gopath \
+            --env CGO_ENABLED=1 \
+            ipa-loader-release sh -eu -c '
+              go mod verify
+              go test -race -count=1 -tags ci ./...
+              go vet -tags ci ./...
+              go run ./cmd/release linux
+              build/release/IPA-Loader-linux-amd64.bin --check-runtime
+              go run ./cmd/release windows
+            '
+      - name: Collect release assets and checksums
+        run: |
+          cp app/build/release/IPA-Loader-linux-amd64.bin \
+            app/build/release/IPA-Loader-windows-amd64.exe release-assets/
+          cd release-assets
+          sha256sum IPA-Loader-* > SHA256SUMS.txt
+      - name: Upload complete release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ github.ref_name }}
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 14
+          overwrite: true
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --json isDraft > release-state.json; then
+            # Reruns can refresh a draft, but must never modify a published release.
+            jq -e '.isDraft == true' release-state.json
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* \
+              --draft --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+          fi

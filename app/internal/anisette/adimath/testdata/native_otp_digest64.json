@@ -1,0 +1,37 @@
+{
+  "scope": "Seeded synthetic 32-byte keys and 64-byte digest inputs, with explicit context.",
+  "vectors": [
+    {
+      "input64_hex": "0fb68dd602c8f05f244b6dc196d01f0436ec161edd4f7fdcfac0a4e93f6b511c94c844b8ef00e5703fb451eafd76ffc0e5312735cd51a702216840588f237d10",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ],
+      "output32_hex": "410f615d0ffc5d68eb57982914c5a31402ebbaf87c0b46bfbc81b154193a18e3"
+    },
+    {
+      "input64_hex": "d2c11f22babd8b0237a8824be072084420f6c9d0b4233d642a23b951da4eb71d7310f546308f5791018bce542e5306858f71e0f4f462800cae75b96a82dd569c",
+      "context": [
+        3245012081,
+        1941958650,
+        2374320128,
+        711877740,
+        1236691583,
+        1941006109,
+        1852075050,
+        3992944481,
+        2346642944,
+        926037525
+      ],
+      "output32_hex": "cdbd94cbb94bc9b27ac7bf477374335aac82907d30d11a3a502efe96e69a67f7"
+    }
+  ]
+}

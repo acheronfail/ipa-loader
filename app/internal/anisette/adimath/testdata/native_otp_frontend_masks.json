@@ -1,0 +1,13 @@
+{
+  "scope": "Every raw32 byte was replaced with seeded synthetic data before native decoding; normalized semantic32 and preparation16 masks captured.",
+  "vectors": [
+    {
+      "normalized32_hex": "ad635d5e0b057121ae89b928c85346f3b37895fe9d147e775cbbe090c419de9a",
+      "masks16_hex": "635e0521892853f378fe1477bb90199a"
+    },
+    {
+      "normalized32_hex": "7014cfaab3700a7cbd6a56a2bef151b3a5624a30f4783ccf8c58fd28213c389b",
+      "masks16_hex": "14aa707c6aa2f1b3623078cf58283c9b"
+    }
+  ]
+}

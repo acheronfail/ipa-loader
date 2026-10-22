@@ -1,0 +1,82 @@
+{
+  "format": 1,
+  "fixtures": [
+    {
+      "file": "ipa-loader-fixture-v1-unsigned.ipa",
+      "purpose": "Main app; saved counter baseline",
+      "bundle_id": "org.ipaloader.fixture",
+      "version": "1.0",
+      "build": "1",
+      "bytes": 8512,
+      "sha256": "593fac40ad197598171a1710012b7b1009a2880920c81346f90d699bb9f82569",
+      "rebuild_from_repo_root": "sh scripts/build_fixture.sh 1",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    },
+    {
+      "file": "ipa-loader-fixture-v2-unsigned.ipa",
+      "purpose": "Main app; saved counter update",
+      "bundle_id": "org.ipaloader.fixture",
+      "version": "2.0",
+      "build": "2",
+      "bytes": 8513,
+      "sha256": "91c54dfbb605c89f6f8d622cde84a4767a8adf72a1b7eabdb680f48352f7d890",
+      "rebuild_from_repo_root": "sh scripts/build_fixture.sh 2",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    },
+    {
+      "file": "ipa-loader-framework-v1-unsigned.ipa",
+      "purpose": "Thin arm64 app, embedded framework and dylib",
+      "bundle_id": "org.ipaloader.frameworktest",
+      "version": "1.0",
+      "build": "1",
+      "bytes": 10757,
+      "sha256": "1a222e469da4505446e88ea0e65af300acb1de16eb00a9412f066412bf74a7f2",
+      "rebuild_from_repo_root": "python3 scripts/build_framework_fixture.py 1",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    },
+    {
+      "file": "ipa-loader-framework-v3-universal.ipa",
+      "purpose": "arm64/arm64e app, framework and dylib",
+      "bundle_id": "org.ipaloader.frameworktest",
+      "version": "3.0",
+      "build": "3",
+      "bytes": 19662,
+      "sha256": "0a13a24be8013c722c26e621f3ad3d4b5770485b06b319986b7d678ad52ab365",
+      "rebuild_from_repo_root": "python3 scripts/build_framework_fixture.py 3 --universal",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    },
+    {
+      "file": "ipa-loader-extension-v1-unsigned.ipa",
+      "purpose": "Basic Share extension",
+      "bundle_id": "org.ipaloader.extensiontest",
+      "version": "1.0",
+      "build": "1",
+      "bytes": 14571,
+      "sha256": "fa995b38758918a386450d2fffb0d2e93ce873f92d5e117dedd5fc598bf72269",
+      "rebuild_from_repo_root": "python3 scripts/build_extension_fixture.py 1",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    },
+    {
+      "file": "ipa-loader-extension-v1-free-unsigned.ipa",
+      "purpose": "Basic Share extension with separate free-test identifiers",
+      "bundle_id": "org.ipaloader.extensiontest.free",
+      "version": "1.0",
+      "build": "1",
+      "bytes": 14580,
+      "sha256": "4f9b86204a28543a2bec03cc19122433d74ca704ac3478584a4990ca61e8673b",
+      "rebuild_from_repo_root": "python3 scripts/build_extension_fixture.py 1 --free-account",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    },
+    {
+      "file": "ipa-loader-sharing-v12-adhoc.ipa",
+      "purpose": "Host/Share extension using app group, shared defaults and shared keychain",
+      "bundle_id": "org.ipaloader.sharingtest",
+      "version": "12.0",
+      "build": "12",
+      "bytes": 22080,
+      "sha256": "a4104d005eeffb18fd7d607dc630690e2a57344a7c8023256487a82b0e9de04b",
+      "rebuild_from_repo_root": "python3 scripts/build_sharing_fixture.py 12",
+      "signing": "unsigned-or-ad-hoc input; no developer profile"
+    }
+  ]
+}

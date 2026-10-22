@@ -1,0 +1,53 @@
+{
+  "scope": "Eight independent456-byte synthetic messages; native executes SHA1, encoder, fresh input-dependent context/banks, and backend. Go freezes only the first synthetic representation context.",
+  "vectors": [
+    {
+      "encoded16_hex": "20355706c093e8e781582cbe88e8ca46",
+      "wire20_hex": "dd4361aa853f5a086bbf047391e4bef51999377e",
+      "seed": 87231,
+      "sha1_hex": "8f65065493c7bdb1d60075e4d3b497181999377e"
+    },
+    {
+      "encoded16_hex": "a6fd319f6ce72b76df87586a2d8fbe67",
+      "wire20_hex": "67af08cf2cede53c099c096efd8ffba89b90e745",
+      "seed": 87232,
+      "sha1_hex": "09ad60cd3fb37e2088df013076d3e3399b90e745"
+    },
+    {
+      "encoded16_hex": "d8c2caa375adb9d5296ffc4a01367e68",
+      "wire20_hex": "e291ec43fc5819030d86a8fcebaf5a4755423255",
+      "seed": 87233,
+      "sha1_hex": "77929bf126f9ec837e37a5105a6a233655423255"
+    },
+    {
+      "encoded16_hex": "4e03a03eb12875fec5da3323a90cd33f",
+      "wire20_hex": "656b667e6aa3e50f5b837ef287430504bcd8c497",
+      "seed": 87234,
+      "sha1_hex": "e153f16ce27c20a892826a79f2508e61bcd8c497"
+    },
+    {
+      "encoded16_hex": "9b3d061eba6dec812c95ceaae8e4dc40",
+      "wire20_hex": "736486e0a9b49278a7e4ac3f4d226cbc7b23ef76",
+      "seed": 87235,
+      "sha1_hex": "346d574ce939b9d77bcd97f0b3b8811e7b23ef76"
+    },
+    {
+      "encoded16_hex": "7b36d268376bbd557f5e9ac1a4de28ca",
+      "wire20_hex": "30b290947375229a414a760117058c9d960fe1e8",
+      "seed": 87236,
+      "sha1_hex": "d466833a643fe8032806c39bff827594960fe1e8"
+    },
+    {
+      "encoded16_hex": "48c503fef718be7cec549aed431e8674",
+      "wire20_hex": "e29640559153604415bbcea3b0d31c57a4fdc99b",
+      "seed": 87237,
+      "sha1_hex": "e79552aca44ceb2abb0cc3b71842db2aa4fdc99b"
+    },
+    {
+      "encoded16_hex": "d6f70f9e512626e293fecdf30d83c1cc",
+      "wire20_hex": "a656689737d8fe1e4f9f299e3e3c76292ce8c256",
+      "seed": 87238,
+      "sha1_hex": "79a75ecc027273b4c4a694a956df9c922ce8c256"
+    }
+  ]
+}

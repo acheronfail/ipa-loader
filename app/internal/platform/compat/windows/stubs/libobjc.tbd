@@ -1,0 +1,12 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libobjc.A.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ '_class_getInstanceMethod', '_method_exchangeImplementations',
+      '_objc_autoreleasePoolPop', '_objc_autoreleasePoolPush',
+      '_objc_autoreleaseReturnValue', '_objc_enumerationMutation',
+      '_objc_msgSend', '_objc_release', '_objc_retain',
+      '_objc_retainAutoreleasedReturnValue', '_objc_storeStrong' ]
+...

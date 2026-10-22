@@ -1,0 +1,67 @@
+# Third-party checkouts, tools, caches and locally installed dependencies
+research/tools/
+research/reference/
+research/runtime/
+macos/build/
+research/cache/
+research/artifacts/
+research/private/
+**/__pycache__/
+.DS_Store
+app/.cache/
+app/build/
+
+# Generated research output
+research/reports/
+research/evidence/*
+
+# Generated unsigned baseline apps and IPA archives
+fixtures/build/
+
+# Local executables, signing material, account sessions and environment files.
+*.test
+*.exe
+*.ipa
+*.app/
+*.dSYM/
+*.p12
+*.pfx
+*.p8
+*.key
+*.pem
+*.mobileprovision
+.env
+.env.*
+!.env.example
+*session.json
+*session-*.json
+*-session.json
+*.log
+*.pyc
+
+# Native compiler/linker outputs, including Windows handoff builds.
+*.dll
+*.dylib
+*.lib
+*.a
+*.o
+*.obj
+*.pdb
+*.exp
+*.so
+*.so.*
+
+# Reviewed, portable test inputs only; generated/account-signed IPAs stay ignored.
+!fixtures/ipas/ipa-loader-fixture-v1-unsigned.ipa
+!fixtures/ipas/ipa-loader-fixture-v2-unsigned.ipa
+!fixtures/ipas/ipa-loader-framework-v1-unsigned.ipa
+!fixtures/ipas/ipa-loader-framework-v3-universal.ipa
+!fixtures/ipas/ipa-loader-extension-v1-unsigned.ipa
+!fixtures/ipas/ipa-loader-extension-v1-free-unsigned.ipa
+!fixtures/ipas/ipa-loader-sharing-v12-adhoc.ipa
+
+# Generated embedded release runtime
+app/internal/runtimebundle/payload.zip
+
+# Local agent configuration
+.agents/

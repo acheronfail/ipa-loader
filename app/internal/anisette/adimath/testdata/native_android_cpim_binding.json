@@ -1,0 +1,37 @@
+{
+  "scope": "All semantic key bytes synthetic, substituted before native pointer de-obfuscation; native constructs fresh key-dependent representation banks for every vector. Fixed-body Go comparison uses only synthetic key1 banks.",
+  "vectors": [
+    {
+      "normalized_prekey32_hex": "338ab1ea3ef4cc63187751fdaaec23380ad02a22e17343e0c6fc98d503576d20",
+      "field32_hex": "e3ca9d8ed806456f4fbbf2c855510f002e570e7bd80bea431213b2d0dc8aeeb9"
+    },
+    {
+      "normalized_prekey32_hex": "eefd231e8681b73e0b94be77dc4e34781ccaf5ec881f0158161f856de6728b21",
+      "field32_hex": "587ecdd148bde6c803c70d563efdb1d181baa32eb7bb3491d5ecf7ad91b8473c"
+    },
+    {
+      "normalized_prekey32_hex": "b436808562a2889fbdd0b41c61cc5e3dc52d9e6a73cdb810de02bcaa51fdf767",
+      "field32_hex": "eea36d10c7e208d3c15f8c4d4d10643d153a66c09fef84df598f2362015a12a6"
+    },
+    {
+      "normalized_prekey32_hex": "fe746d4646a4468d75ef5401ef4100e3ded89bffd17bd854b1de6e27dfa5e4c0",
+      "field32_hex": "e6e1ed3680366d942809ec7d2d6ea42f9be7faab817688eb0b1ef73c9af41ffd"
+    },
+    {
+      "normalized_prekey32_hex": "628245500672ef6df93fe5b5f1604e8ff56127a4067fb1d8b5b62ec086dc7ec9",
+      "field32_hex": "c1b6e1adddc056e0d831022432aeeae52a7be5dc5f3459e9545bbf1f2cd2b92f"
+    },
+    {
+      "normalized_prekey32_hex": "e18643ac0b8801fe125b05005a67e15d450f7c0eb4920fbe74729dc2ea46b366",
+      "field32_hex": "efbd2bf0f0f8bafba0e3134ebb768d55a6713b36800f251862ed845a3b5d3744"
+    },
+    {
+      "normalized_prekey32_hex": "e70bfe8ef0e5fc5d0b094cb78d8f06b72e4e8f41ea7b7ba6dbceb019ce4c7d04",
+      "field32_hex": "fd681e0b799afbd45faaf199a4eccaeb6a558773f55ce4a759046f2cc86d05b4"
+    },
+    {
+      "normalized_prekey32_hex": "20d7a1270d78bf7c3c64492528ad822d12bcc1aa362e59d886ea4f86fabeb78a",
+      "field32_hex": "beeb88dfef637ec84b2986f95ac27cadeb34cc432ac384db0cb7fe695b879608"
+    }
+  ]
+}

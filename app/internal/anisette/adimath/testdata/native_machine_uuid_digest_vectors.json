@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "artifact_sha256": "c193f8e010b4693bc064632a63a994bc718afa59ec238afd79bb682fd19bbe45",
+  "vectors": [
+    {
+      "uuid": "00112233445566778899aabbccddeeff",
+      "digest": "82896128420ef3ba1df50ed3542529f65926f9e0"
+    },
+    {
+      "uuid": "00112233445566778899aabbccddeefe",
+      "digest": "6bf48df4c5c208825ec643f9c2c5e853778f0bf0"
+    },
+    {
+      "uuid": "00000000000000000000000000000000",
+      "digest": "076af6bba2b66aedcedafc13a06529fd7a07cdc8"
+    },
+    {
+      "uuid": "13385d82a7ccf1163b6085aacff4193e",
+      "digest": "68b105b66a8363c6f91e2b5f6e89889414121e62"
+    }
+  ],
+  "limitations": [
+    "Only newly supplied synthetic UUIDs, offline emulated device services.",
+    "Digest precedes final16byte machine-field transformation."
+  ]
+}

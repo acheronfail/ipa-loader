@@ -1,0 +1,53 @@
+{
+  "scope": "Eight fully synthetic20-byte semantic hash inputs substituted before machine encoder. Native rebuilds its input-dependent representation and banks for every case. Go uses one synthetic baseline identity representation.",
+  "vectors": [
+    {
+      "encoded16_hex": "34cc342e3db64da31739dc31a1a6aaf0",
+      "raw_body16_hex": "c67dcbb1c10058dd2aefdffab4c398a9",
+      "seed": 87231,
+      "sha1_hex": "338ab1ea3ef4cc63187751fdaaec23380ad02a22"
+    },
+    {
+      "encoded16_hex": "e9bba6da85c336fe04da33bbd704bdb0",
+      "raw_body16_hex": "b603ac5634b2e02657365f55664ea607",
+      "seed": 87232,
+      "sha1_hex": "eefd231e8681b73e0b94be77dc4e34781ccaf5ec"
+    },
+    {
+      "encoded16_hex": "b370054161e0095fb29e39d06a86d7f5",
+      "raw_body16_hex": "1a0a1b343f0330fef7f90e8053123f91",
+      "seed": 87233,
+      "sha1_hex": "b436808562a2889fbdd0b41c61cc5e3dc52d9e6a"
+    },
+    {
+      "encoded16_hex": "f932e88245e6c74d7aa1d9cde40b892b",
+      "raw_body16_hex": "e3c7275ebbe72122ebd94872e4b09e2c",
+      "seed": 87234,
+      "sha1_hex": "fe746d4646a4468d75ef5401ef4100e3ded89bff"
+    },
+    {
+      "encoded16_hex": "65c4c09405306eadf6716879fa2ac747",
+      "raw_body16_hex": "8d334d35e5fc35c53e53c33312d3ba3a",
+      "seed": 87235,
+      "sha1_hex": "628245500672ef6df93fe5b5f1604e8ff56127a4"
+    },
+    {
+      "encoded16_hex": "e6c0c66808ca803e1d1588cc512d6895",
+      "raw_body16_hex": "fb8d0797a25e74737e5fe80e7f4fcba9",
+      "seed": 87236,
+      "sha1_hex": "e18643ac0b8801fe125b05005a67e15d450f7c0e"
+    },
+    {
+      "encoded16_hex": "e04d7b4af3a77d9d0447c17b86c58f7f",
+      "raw_body16_hex": "dd06d0b4a16bd7c9a9e18eb202179ded",
+      "seed": 87237,
+      "sha1_hex": "e70bfe8ef0e5fc5d0b094cb78d8f06b72e4e8f41"
+    },
+    {
+      "encoded16_hex": "279124e30e3a3ebc332ac4e923e70be5",
+      "raw_body16_hex": "9bf8a7ed5c395b5a5996025ce52541b1",
+      "seed": 87238,
+      "sha1_hex": "20d7a1270d78bf7c3c64492528ad822d12bcc1aa"
+    }
+  ]
+}
