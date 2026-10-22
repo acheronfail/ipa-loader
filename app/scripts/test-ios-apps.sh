@@ -43,7 +43,7 @@ codesign --force --sign - "$bundle"
 xcrun simctl install "$1" "$bundle"
 xcrun simctl launch --console "$1" "$identifier" >"$test_root/output" 2>&1
 cat "$test_root/output"
-rg -q "PASS: cancellation quietly dismisses the progress sheet" "$test_root/output"
+grep -Fq "PASS: cancellation quietly dismisses the progress sheet" "$test_root/output"
 for variant in builtin localdevvpn; do
  if [ "$variant" = localdevvpn ]; then
   xcrun simctl launch --console "$1" "$identifier" --connection-checks --localdevvpn >"$test_root/output" 2>&1
@@ -51,5 +51,5 @@ for variant in builtin localdevvpn; do
   xcrun simctl launch --console "$1" "$identifier" --connection-checks >"$test_root/output" 2>&1
  fi
  cat "$test_root/output"
- rg -q "PASS: .* connection controls, copy, routing and App Store links" "$test_root/output"
+ grep -Eq "PASS: .* connection controls, copy, routing and App Store links" "$test_root/output"
 done
