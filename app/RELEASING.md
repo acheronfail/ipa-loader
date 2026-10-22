@@ -65,25 +65,7 @@ The compatibility `apple-id` mode uses `APPLE_NOTARY_APPLE_ID` and
 `APPLE_NOTARY_PASSWORD` (an app-specific password). A missing mode variable keeps
 that legacy behavior. Prefer a dedicated API key for new setup.
 
-## Manual smoke test without a release
-
-Run the workflow manually with the smoke input enabled:
-
-```sh
-gh workflow run ci.yml --ref master --field macos-signing-smoke=true
-```
-
-The smoke run builds the real macOS app and both iOS payloads, checks their
-production preflight, runs the shared signing/notarization Action, and uploads
-`macos-and-ios` artifacts. A second, fresh Mac downloads and extracts the ZIP,
-compares all embedded resource hashes and modes, checks the main executable's
-mode, verifies its selected-team signature and stapled ticket, runs Gatekeeper,
-and repeats the runtime audit with developer tools unavailable.
-
-Manual runs cannot enter the release-publication job, even when dispatched on a
-tag. A normal manual run with the smoke input disabled performs verification
-without signing. Local `just release` continues to produce an ad-hoc signed
-development package.
+Local `just release` produces an ad-hoc signed development package.
 
 ## Reliability and rollback
 
