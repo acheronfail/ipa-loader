@@ -4,87 +4,103 @@ Push an exact `vX.Y.Z` tag to run the release workflow. It tests the app, builds
 the macOS app and iOS payloads, signs and notarizes macOS, then builds Linux and
 Windows and creates a **draft** GitHub release. Reruns may update a draft but
 cannot replace assets in an already published release. Normal `master` builds
-run verification without accessing signing credentials or submitting to Apple.
+run verification without signing credentials or Apple submissions.
 
-## macOS signing credentials
+## Shared macOS release Action
 
-Configure these repository Actions secrets:
+The workflow calls the shared `dist-tools/actions/apple-release` Action at an
+immutable commit SHA. Signing, temporary keychains, notarization, ticket retries
+and ZIP packaging are maintained and tested there. Update the pinned reference
+in `.github/workflows/ci.yml` to adopt a reviewed version.
 
-| Secret | Value |
-| --- | --- |
-| `MACOS_CODE_SIGN_P12_BASE64` | Base64-encoded Developer ID Application certificate **and private key** exported as PKCS12 |
-| `MACOS_CODE_SIGN_P12_PASSWORD` | Password protecting that export |
-| `APPLE_NOTARY_APPLE_ID` | Apple Account email for the publishing team |
-| `APPLE_NOTARY_PASSWORD` | An Apple app-specific password for that account |
-
-Set the repository Actions variable `APPLE_TEAM_ID` to the certificate's ten
-character team ID. The workflow fails early if any required value is missing;
-there is no unsigned release fallback.
+IPA Loader supplies its bundle ID, app/output paths and post-sign runtime audit.
+The Action signs the outer app with hardened runtime and a timestamp without
+recursively re-signing Resources. The embedded iOS IPAs and hashed sharing
+adapter must remain byte-for-byte unchanged. Both iOS account variants still
+pass production preflight before macOS signing.
 
 Use a **Developer ID Application** certificate for direct downloads. Apple
-Distribution and Mac Installer certificates serve different distribution paths;
-a self-signed certificate cannot be used for notarization. A Developer ID
-certificate identifies the developer/team and can sign multiple apps.
+Distribution and Mac Installer certificates serve different distribution paths.
+The notarization API key authenticates with Apple; it does not replace or renew
+the signing certificate.
 
-To install an existing export without printing its secrets:
+## Configure credentials with the sync CLI
 
-```sh
-base64 -i /path/to/developer-id.p12 | gh secret set MACOS_CODE_SIGN_P12_BASE64 --repo acheronfail/ipa-loader
-gh secret set MACOS_CODE_SIGN_P12_PASSWORD --repo acheronfail/ipa-loader < /path/to/export-password.txt
-gh variable set APPLE_TEAM_ID --repo acheronfail/ipa-loader --body YOURTEAMID
-gh secret set APPLE_NOTARY_APPLE_ID --repo acheronfail/ipa-loader
-gh secret set APPLE_NOTARY_PASSWORD --repo acheronfail/ipa-loader
-```
+Keep the authoritative credential JSON in encrypted storage and supply it to the
+`dist-tools` CLI through stdin. The source needs these fields for a team API key:
 
-The last two commands prompt for values. Generate the app-specific password at
-[Apple Account](https://account.apple.com/) under Sign-In and Security →
-App-Specific Passwords. This is separate from the PKCS12 password and your normal
-Apple Account password. Do not commit credential files or paste values into
-workflow YAML. GitHub can list secret names but cannot retrieve secret values
-from another repository.
+| Field | Purpose |
+| --- | --- |
+| `MACOS_CODE_SIGN_P12_BASE64` | Developer ID Application certificate and private key exported as PKCS12, base64 encoded |
+| `MACOS_CODE_SIGN_P12_PASSWORD` | Password protecting that export |
+| `APPLE_TEAM_ID` | Certificate's ten-character team ID |
+| `APPLE_NOTARY_AUTH_MODE` | `api-team` |
+| `APPLE_NOTARY_API_KEY` | App Store Connect `.p8` private key text |
+| `APPLE_NOTARY_KEY_ID` | API key ID |
+| `APPLE_NOTARY_ISSUER_ID` | Team key issuer UUID |
 
-## Reliability and verification
-
-The build completes before credentials are imported into a disposable keychain
-on the GitHub-hosted macOS runner. The signing wrapper selects exactly one valid
-Developer ID Application identity matching `APPLE_TEAM_ID`, enables unattended
-key access, and restores the original keychain search list on exit. Cleanup
-commands have a 15-second timeout to avoid hanging during runner teardown.
-
-The app is signed with a secure timestamp and hardened runtime. Signing does not
-use `--deep`, preserving the embedded iOS payloads and hashed sharing adapter.
-The runtime audit is repeated after signing. Notarization verifies the app's
-identifier, Apple certificate chain and team before uploading.
-
-The workflow carries over the fixes from `float-view-mobile`:
-
-- On the disposable runner, block UDP 443 to force ticket delivery over TCP,
-  working around [actions/runner-images#14924](https://github.com/actions/runner-images/issues/14924).
-- Submit once, wait up to 20 minutes, and record Apple's submission ID. A timeout,
-  transport error, malformed response or rejection fails the release.
-- Retry only CloudKit lookup error 68 for both `stapler staple` and
-  `stapler validate`, at most four attempts with delays of 5, 10 and 15 seconds.
-  Retrying ticket retrieval never resubmits the app to Apple.
-- Require ticket validation, signature verification and Gatekeeper assessment.
-  Rebuild the ZIP from the stapled app, verify its integrity, and atomically
-  replace the output only after every check passes. Only then upload assets.
-
-Rejected submissions print Apple's issue codes and messages in the CI log.
-Use the recorded ID with `xcrun notarytool log` to investigate. Notary logs and
-credentials are not included in release assets. A submission still processing
-after the timeout must not be treated as accepted; inspect its status before
-deciding whether to rerun the job.
-
-Run the mocked failure/retry regression tests locally with:
+In the `dist-tools` checkout, put the target repository in an ignored local
+allowlist and validate before writing:
 
 ```sh
-node --test scripts/macos-notarization.test.mjs
+credential-json-export | bin/dist-tools apple credentials inspect
+credential-json-export | bin/dist-tools apple credentials sync \
+  --config .local/repositories.json --repo OWNER/REPOSITORY --dry-run
+credential-json-export | bin/dist-tools apple credentials sync \
+  --config .local/repositories.json --repo OWNER/REPOSITORY
 ```
 
-These tests exercise the shell scripts without contacting Apple or importing
-identities. A real tagged CI run is needed to verify the configured credentials
-and Apple's acceptance of the complete release bundle. Local `just release`
-continues to produce an ad-hoc signed development package.
+`credential-json-export` is a placeholder for your decrypted JSON export. No
+password-manager integration is required. Do not commit the source, paste its
+values into workflow YAML, or publish it as an artifact.
 
-See Apple's [custom notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
-for service requirements and troubleshooting.
+Sync validates the PKCS12 and selected auth mode before any writes, installs the
+selected mode's secrets, installs a protected `APPLE_TEAM_ID` secret for log masking, and sets
+`APPLE_TEAM_ID` and `APPLE_NOTARY_AUTH_MODE` compatibility/configuration variables. Review per-repository results and rerun after partial failures. The
+workflow forwards only the selected mode's credentials, allowing older secrets
+to remain available for rollback.
+
+Individual API keys use `api-individual`, omit the issuer and require Xcode 26+.
+The compatibility `apple-id` mode uses `APPLE_NOTARY_APPLE_ID` and
+`APPLE_NOTARY_PASSWORD` (an app-specific password). A missing mode variable keeps
+that legacy behavior. Prefer a dedicated API key for new setup.
+
+## Manual smoke test without a release
+
+Run the workflow manually with the smoke input enabled:
+
+```sh
+gh workflow run ci.yml --ref master --field macos-signing-smoke=true
+```
+
+The smoke run builds the real macOS app and both iOS payloads, checks their
+production preflight, runs the shared signing/notarization Action, and uploads
+`macos-and-ios` artifacts. A second, fresh Mac downloads and extracts the ZIP,
+compares all embedded resource hashes and modes, checks the main executable's
+mode, verifies its selected-team signature and stapled ticket, runs Gatekeeper,
+and repeats the runtime audit with developer tools unavailable.
+
+Manual runs cannot enter the release-publication job, even when dispatched on a
+tag. A normal manual run with the smoke input disabled performs verification
+without signing. Local `just release` continues to produce an ad-hoc signed
+development package.
+
+## Reliability and rollback
+
+The shared Action submits once, waits for acceptance, and retries only transient
+ticket lookups. It restores the runner keychain search list, bounds cleanup,
+requires final signature/ticket/Gatekeeper checks, and creates the ZIP from the
+stapled app. Failed signing/notarization does not replace a prior output ZIP.
+The hosted-runner-only ticket networking workaround is enabled through an Action
+input rather than duplicated in this repository.
+
+Generic failure/retry tests live in `dist-tools`; this repository retains its
+app-specific runtime and iOS preflight tests. Use the notarization submission ID
+from the workflow to investigate a timeout before deciding to resubmit. Raw
+notary logs are not release assets.
+
+Retain the prior encrypted credential version and working Action SHA during
+rotation. Restore that source with one sync and revert the Action reference if
+needed. For the initial migration, reverting the migration restores the previous
+local scripts/workflow. Older Apple Account secrets remain available; do not
+revoke a valid predecessor certificate as a routine rotation step.

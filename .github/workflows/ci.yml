@@ -54,7 +54,7 @@ jobs:
       - name: Check macOS release credentials
         if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
         env:
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_CODE_SIGN_P12_BASE64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
           APPLE_CODE_SIGN_P12_PASSWORD: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
           APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
@@ -103,9 +103,6 @@ jobs:
         if: github.event_name != 'workflow_dispatch' || !inputs.macos-signing-smoke
         timeout-minutes: 10
         run: sh scripts/test-ios-apps.sh
-      - name: Test macOS signing and notarization failure handling
-        if: github.event_name != 'workflow_dispatch' || !inputs.macos-signing-smoke
-        run: node --test ../scripts/macos-notarization.test.mjs
       - name: Build and audit macOS app and both iOS payloads
         id: macos
         if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
@@ -131,12 +128,12 @@ jobs:
       - name: Sign, notarize and staple macOS release
         if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.macos-signing-smoke)
         timeout-minutes: 30
-        uses: acheronfail/dist-tools/actions/apple-release@fae16608228264d72a2bd71c428798f7f12318e4
+        uses: acheronfail/dist-tools/actions/apple-release@fae181a929fcabd1d699176b559e4d6414e18b76
         with:
           app-path: ${{ github.workspace }}/app/build/IPA Loader.app
           bundle-id: org.ipaloader.desktop
           output-archive: ${{ steps.macos.outputs.archive }}
-          team-id: ${{ vars.APPLE_TEAM_ID }}
+          team-id: ${{ secrets.APPLE_TEAM_ID }}
           p12-base64: ${{ secrets.MACOS_CODE_SIGN_P12_BASE64 }}
           p12-password: ${{ secrets.MACOS_CODE_SIGN_P12_PASSWORD }}
           notary-auth-mode: ${{ vars.APPLE_NOTARY_AUTH_MODE || 'apple-id' }}
@@ -195,7 +192,7 @@ jobs:
           PYTHON
       - name: Verify signature, stapled ticket, Gatekeeper and runtime
         env:
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           app="$RUNNER_TEMP/extracted/IPA Loader.app"
           requirement="anchor apple generic and identifier \"org.ipaloader.desktop\" and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = \"$APPLE_TEAM_ID\""
