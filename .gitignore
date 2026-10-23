@@ -46,6 +46,7 @@ fixtures/build/
 *.a
 *.o
 *.obj
+*.syso
 *.pdb
 *.exp
 *.so

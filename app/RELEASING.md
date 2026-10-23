@@ -12,6 +12,13 @@ digests. The tag supplies the IPA version; publish a higher `vX.Y.Z` to offer an
 update. The first version containing the updater must be installed through the
 existing desktop setup flow.
 
+Windows builds generate the executable's multi-size icon from the desktop brand
+with `go run ./cmd/windows-resources cmd/ipa-loader/rsrc_windows_amd64.syso`.
+Both native and cross builds pass the GUI subsystem explicitly to Zig's linker.
+The package audit rejects console executables and missing icon resources. To
+check a local build, set `IPA_LOADER_TEST_WINDOWS_EXE` to its absolute path and
+run `go test -run TestBuiltWindowsDesktop ./internal/releaseaudit` from `app`.
+
 ## Shared macOS release Action
 
 The workflow uses `dist-tools/actions/apple-release@v1`, which tracks compatible

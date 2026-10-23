@@ -5,6 +5,7 @@ package releaseaudit
 import (
 	"crypto/sha256"
 	"debug/pe"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -47,6 +48,11 @@ func inspectExecutable(path string, expected uint16) ([]string, error) {
 	if image.Machine != expected {
 		return nil, errors.New("Release executable has the wrong architecture")
 	}
+	if strings.EqualFold(filepath.Base(path), "ipa-loader.exe") {
+		if err := inspectDesktop(image); err != nil {
+			return nil, err
+		}
+	}
 	symbols, err := image.ImportedSymbols()
 	if err != nil {
 		return nil, err
@@ -68,6 +74,58 @@ func inspectExecutable(path string, expected uint16) ([]string, error) {
 	}
 	sort.Strings(imports)
 	return imports, nil
+}
+
+// Inspect the final linked binary: compiler flags alone do not guarantee that
+// an external linker preserved the GUI subsystem or included the icon resource.
+func inspectDesktop(image *pe.File) error {
+	header, ok := image.OptionalHeader.(*pe.OptionalHeader64)
+	if !ok || header.Subsystem != pe.IMAGE_SUBSYSTEM_WINDOWS_GUI {
+		return errors.New("Windows desktop executable must use the GUI subsystem (no console)")
+	}
+	resource := header.DataDirectory[pe.IMAGE_DIRECTORY_ENTRY_RESOURCE]
+	if resource.VirtualAddress == 0 || resource.Size < 16 {
+		return errors.New("Windows desktop executable is missing icon resources")
+	}
+	for _, section := range image.Sections {
+		if resource.VirtualAddress < section.VirtualAddress {
+			continue
+		}
+		offset := uint64(resource.VirtualAddress - section.VirtualAddress)
+		if offset+uint64(resource.Size) > uint64(section.Size) {
+			continue
+		}
+		data := make([]byte, resource.Size)
+		if _, err := section.ReadAt(data, int64(offset)); err != nil {
+			return err
+		}
+		count := int(binary.LittleEndian.Uint16(data[12:])) + int(binary.LittleEndian.Uint16(data[14:]))
+		if count > (len(data)-16)/8 {
+			return errors.New("Invalid Windows resource directory")
+		}
+		var icon, group bool
+		for i := 0; i < count; i++ {
+			entry := data[16+i*8:]
+			id := binary.LittleEndian.Uint32(entry)
+			child := binary.LittleEndian.Uint32(entry[4:])
+			// Resource types must lead to a nonempty name/ID directory.
+			start := uint64(child & 0x7fffffff)
+			if child&0x80000000 == 0 || start+16 > uint64(len(data)) {
+				continue
+			}
+			directory := data[start:]
+			if binary.LittleEndian.Uint16(directory[12:]) == 0 && binary.LittleEndian.Uint16(directory[14:]) == 0 {
+				continue
+			}
+			icon = icon || id == 3    // RT_ICON
+			group = group || id == 14 // RT_GROUP_ICON
+		}
+		if icon && group {
+			return nil
+		}
+		break
+	}
+	return errors.New("Windows desktop executable must embed an icon and icon group")
 }
 
 func Inventory(root string) ([]FileRecord, error) {

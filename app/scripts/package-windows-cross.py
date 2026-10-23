@@ -62,8 +62,9 @@ def main():
     host=dict(env,CGO_ENABLED='0',ZIG=zig)
     run(['go','run','./cmd/licenses',stage/'licenses'],host)
     run(['go','run','./cmd/embed-runtime','internal/runtimebundle/payload.zip',stage/'sharing-windows',stage/'licenses',stage/'ios'],host)
+    run(['go','run','./cmd/windows-resources','cmd/ipa-loader/rsrc_windows_amd64.syso'],host)
     target=dict(env,GOOS='windows',GOARCH='amd64',CGO_ENABLED='1')
-    run(['go','build','-tags','bundled','-trimpath','-ldflags','-s -w -H=windowsgui','-o',stage/'ipa-loader.exe','./cmd/ipa-loader'],target,CACHE/'go-build.log')
+    run(['go','build','-tags','bundled','-trimpath','-ldflags','-s -w -H=windowsgui -extldflags=-Wl,--subsystem,windows','-o',stage/'ipa-loader.exe','./cmd/ipa-loader'],target,CACHE/'go-build.log')
     run(['go','run','./cmd/cross-package-check','-root',stage],host)
     output=release/'IPA-Loader-windows-amd64.exe';shutil.copy2(stage/'ipa-loader.exe',output)
     with zipfile.ZipFile(release/'IPA-Loader-windows-amd64-cross.zip','w',zipfile.ZIP_DEFLATED) as out:

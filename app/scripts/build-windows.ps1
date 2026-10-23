@@ -30,7 +30,10 @@ try {
         & go test -count=1 -tags ci ./cmd/... ./internal/...
         if ($LASTEXITCODE -ne 0) { throw 'Windows native tests failed.' }
     }
-    $goBuildArgs = @('build', '-trimpath', '-ldflags', '-H=windowsgui', '-o', (Join-Path $output 'ipa-loader.exe'))
+    & go run ./cmd/windows-resources cmd/ipa-loader/rsrc_windows_amd64.syso
+    if ($LASTEXITCODE -ne 0) { throw 'Windows icon resource generation failed.' }
+    # Zig's external linker needs an explicit subsystem in addition to Go's flag.
+    $goBuildArgs = @('build', '-trimpath', '-ldflags', '-H=windowsgui -extldflags=-Wl,--subsystem,windows', '-o', (Join-Path $output 'ipa-loader.exe'))
     if ($Bundled) { $goBuildArgs += @('-tags', 'bundled') }
     $goBuildArgs += './cmd/ipa-loader'
     & go @goBuildArgs
