@@ -101,7 +101,10 @@ func (s *Screen) showOperation(title string) {
 		}
 		destination := caption(summary)
 		singleLine(destination)
-		s.operationDone = widget.NewButton("Done", func() { s.operationDialog.Hide() })
+		s.operationDone = widget.NewButton("Done", func() {
+			s.operationDialog.Hide()
+			s.status.Show()
+		})
 		s.operationDone.Importance = widget.HighImportance
 		s.operationAccount = widget.NewButton("Sign In Again…", s.reauthenticate)
 		s.operationAccount.Importance = widget.HighImportance
@@ -116,6 +119,7 @@ func (s *Screen) showOperation(title string) {
 		s.operationContent = inset(16, container.NewBorder(top, actions, nil, nil, s.activityScroll))
 		s.operationDialog = widget.NewModalPopUp(s.operationContent, s.Window.Canvas())
 	}
+	s.status.Hide()
 	s.operationDialog.Show()
 	s.resizeOperation()
 }

@@ -304,6 +304,7 @@ func (s *Screen) returnToLogin() {
 		s.operationDialog.Hide()
 		s.operationDialog = nil
 	}
+	s.status.Show()
 	s.installPage.Hide()
 	s.loginPage.Show()
 	s.updateAccountContinuation()
