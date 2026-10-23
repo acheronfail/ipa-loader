@@ -105,6 +105,10 @@ func TestSignedIPAPackaging(t *testing.T) {
 	if err := os.WriteFile(binary, thin(), 0755); err != nil {
 		t.Fatal(err)
 	}
+	asset := strings.Repeat("dictionary entry\n", 65536)
+	if err := os.WriteFile(filepath.Join(app, "dictionary"), []byte(asset), 0644); err != nil {
+		t.Fatal(err)
+	}
 	archive, err := packageSignedApp(context.Background(), app, work)
 	if err != nil {
 		t.Fatal(err)
@@ -127,6 +131,17 @@ func TestSignedIPAPackaging(t *testing.T) {
 				t.Fatal("lost bytes or executable permission")
 			}
 			found = true
+		}
+		if member.Name == "Payload/Test.app/dictionary" {
+			r, err := member.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := io.ReadAll(r)
+			r.Close()
+			if err != nil || string(body) != asset || member.Method != zip.Deflate || member.CompressedSize64 >= member.UncompressedSize64/2 {
+				t.Fatal("compressible assets expanded during IPA packaging", err)
+			}
 		}
 	}
 	if !found {

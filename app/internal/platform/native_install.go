@@ -2,6 +2,7 @@ package platform
 
 import (
 	"archive/zip"
+	"compress/flate"
 	"context"
 	"encoding/json"
 	"errors"
@@ -150,8 +151,9 @@ func nativeInstallFailure(err error, submitted bool) error {
 	return fmt.Errorf("Reconnect your iPhone, unlock it, and retry. The app was not submitted for installation (%w)", err)
 }
 
-// Stream a fresh ZIP64-capable IPA. Store avoids recompressing multi-gigabyte
-// assets and gives a predictable disk requirement without any fixed size cap.
+// Stream a compressed IPA. Storing expanded assets can unnecessarily push a
+// package past the classic ZIP size limit and doubles transfer/storage costs
+// for large, compressible apps. Keep ZIP64 support for apps that still need it.
 func packageSignedApp(ctx context.Context, appPath, work string) (dest string, err error) {
 	var required uint64
 	err = filepath.WalkDir(appPath, func(path string, entry fs.DirEntry, walkErr error) error {
@@ -169,7 +171,8 @@ func packageSignedApp(ctx context.Context, appPath, work string) (dest string, e
 			return failure("Signed app contains an unsupported file type")
 		}
 		// Bound header overhead as well as file data, with checked addition.
-		size := uint64(info.Size()) + uint64(len(path))*2 + 512
+		// Include room for DEFLATE block overhead even for incompressible data.
+		size := uint64(info.Size()) + uint64(info.Size())/1000 + uint64(len(path))*2 + 1024
 		if ^uint64(0)-required < size {
 			return failure("Signed app is too large for this filesystem")
 		}
@@ -193,6 +196,9 @@ func packageSignedApp(ctx context.Context, appPath, work string) (dest string, e
 		}
 	}()
 	writer := zip.NewWriter(file)
+	writer.RegisterCompressor(zip.Deflate, func(w io.Writer) (io.WriteCloser, error) {
+		return flate.NewWriter(w, flate.BestSpeed)
+	})
 	err = filepath.WalkDir(appPath, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -220,7 +226,7 @@ func packageSignedApp(ctx context.Context, appPath, work string) (dest string, e
 			return err
 		}
 		header.SetMode(mode)
-		header.Name, header.Method = "Payload/"+filepath.ToSlash(relative), zip.Store
+		header.Name, header.Method = "Payload/"+filepath.ToSlash(relative), zip.Deflate
 		if info.IsDir() {
 			header.Name += "/"
 		}
