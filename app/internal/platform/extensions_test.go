@@ -35,15 +35,15 @@ func TestExtensionDiscoveryAndNestedLibraries(t *testing.T) {
 }
 
 func TestExtensionMetadataRejectsBrokenRelationship(t *testing.T) {
-	for _, kind := range []string{"unrelated ID", "duplicate ID", "wrong build", "missing extension point", "wrong package", "missing executable", "misplaced", "nested extension"} {
+	for _, kind := range []string{"unrelated ID", "duplicate ID", "missing build", "missing extension point", "wrong package", "missing executable", "misplaced", "nested extension", "legacy in Extensions", "modern in PlugIns"} {
 		t.Run(kind, func(t *testing.T) {
 			ext := extensionMembers(t, "Share", "org.example.fixture.share")
 			info, _ := dictionary(ext[0].data)
 			switch kind {
 			case "unrelated ID":
 				info["CFBundleIdentifier"] = "org.example.other.share"
-			case "wrong build":
-				info["CFBundleVersion"] = "2"
+			case "missing build":
+				delete(info, "CFBundleVersion")
 			case "missing extension point":
 				delete(info, "NSExtension")
 			case "wrong package":
@@ -58,6 +58,13 @@ func TestExtensionMetadataRejectsBrokenRelationship(t *testing.T) {
 				for i := range ext {
 					ext[i].name = strings.Replace(ext[i].name, "/Share.appex/", "/Parent.appex/PlugIns/Share.appex/", 1)
 				}
+			case "legacy in Extensions":
+				for i := range ext {
+					ext[i].name = strings.Replace(ext[i].name, "/PlugIns/", "/Extensions/", 1)
+				}
+			case "modern in PlugIns":
+				delete(info, "NSExtension")
+				info["EXAppExtensionAttributes"] = map[string]any{"EXExtensionPointIdentifier": "com.apple.app-migration"}
 			}
 			ext[0].data, _ = plist.Marshal(info, plist.XMLFormat)
 			m := append(members(t), ext...)
@@ -68,6 +75,31 @@ func TestExtensionMetadataRejectsBrokenRelationship(t *testing.T) {
 				t.Fatal("invalid extension accepted")
 			}
 		})
+	}
+}
+
+func TestExtensionFoundationDiscoveryAndRefresh(t *testing.T) {
+	ext := extensionMembers(t, "Migration", "org.example.fixture.migration")
+	info, _ := dictionary(ext[0].data)
+	delete(info, "NSExtension")
+	info["EXAppExtensionAttributes"] = map[string]any{"EXExtensionPointIdentifier": "com.apple.app-migration"}
+	ext[0].data, _ = plist.Marshal(info, plist.XMLFormat)
+	for i := range ext {
+		ext[i].name = strings.Replace(ext[i].name, "/PlugIns/", "/Extensions/", 1)
+	}
+	m := append(members(t), ext...)
+	m = append(m, extensionMembers(t, "Share", "org.example.fixture.share")...)
+	m = append(m, frameworkMembers(t, "Payload/Fixture.app/Extensions/Migration.appex/Frameworks/Kit.framework")...)
+	app, err := extractIPA(context.Background(), writeIPA(t, m), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(app.Embedded) != 3 || app.Embedded[0].Extension || !app.Embedded[1].Extension || !app.Embedded[2].Extension {
+		t.Fatal("modern extension signing graph is incomplete or not ordered inside out")
+	}
+	paths, err := refreshMemberPaths(app.Path)
+	if err != nil || len(paths) != 3 {
+		t.Fatalf("refresh graph omitted an extension: %v, %v", paths, err)
 	}
 }
 
@@ -172,7 +204,12 @@ func TestDefaultPaidInputKeychainGroups(t *testing.T) {
 
 func TestExtensionProvisioningUsesSelectedIdentityAndOwnProfile(t *testing.T) {
 	work := t.TempDir()
-	app, err := extractIPA(context.Background(), writeIPA(t, append(members(t), extensionMembers(t, "Share", "org.example.fixture.share")...)), work)
+	m := members(t)
+	// Model a repacked app whose extension still has its original version.
+	info, _ := dictionary(m[0].data)
+	info["CFBundleShortVersionString"], info["CFBundleVersion"] = "21.39.4", "21.39.4"
+	m[0].data, _ = plist.Marshal(info, plist.XMLFormat)
+	app, err := extractIPA(context.Background(), writeIPA(t, append(m, extensionMembers(t, "Share", "org.example.fixture.share")...)), work)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,6 +243,14 @@ func TestExtensionProvisioningUsesSelectedIdentityAndOwnProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	object := app.Embedded[0]
+	metadataRaw, err := os.ReadFile(filepath.Join(object.Path, "Info.plist"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := dictionary(metadataRaw)
+	if err != nil || stringField(metadata, "CFBundleShortVersionString") != app.Version || stringField(metadata, "CFBundleVersion") != app.Build {
+		t.Fatal("extension version was not aligned before signing")
+	}
 	if len(actions) != 3 || object.Identifier != childIDs.Installed || object.Entitlements == "" {
 		t.Fatal("extension was not provisioned independently")
 	}

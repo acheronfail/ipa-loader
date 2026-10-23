@@ -20,6 +20,8 @@ type codeObject struct {
 	Entitlements                 string
 	Sharing                      sharingRequest
 	Networking                   networkRequest
+	Capabilities                 capabilityRequest
+	ExtensionPoint               string
 }
 
 func inspectCode(ctx context.Context, app appInfo) ([]codeObject, error) {
@@ -54,7 +56,7 @@ func inspectCode(ctx context.Context, app appInfo) ([]codeObject, error) {
 				ids[strings.ToLower(extension.BundleID)] = true
 				executable := filepath.Join(p, extension.Executable)
 				executables[executable] = true
-				objects = append(objects, codeObject{Path: p, Executable: executable, Identifier: extension.BundleID, Extension: true, Sharing: extension.Sharing, Networking: extension.Networking})
+				objects = append(objects, codeObject{Path: p, Executable: executable, Identifier: extension.BundleID, Extension: true, Sharing: extension.Sharing, Networking: extension.Networking, Capabilities: extension.Capabilities, ExtensionPoint: extension.ExtensionPoint})
 			case ".framework":
 				if !frameworksDirectory(filepath.Dir(p), app.Path) {
 					return failure("Framework must be embedded in a Frameworks directory")
@@ -72,6 +74,9 @@ func inspectCode(ctx context.Context, app appInfo) ([]codeObject, error) {
 					return failure("Unsupported embedded framework metadata")
 				}
 				binaryPath := filepath.Join(p, executable)
+				if err = prepareLibraryArchitectures(binaryPath); err != nil {
+					return fmt.Errorf("Embedded framework %s: %w", filepath.Base(p), err)
+				}
 				if err = inspectMachO(binaryPath, 6); err != nil {
 					return fmt.Errorf("Embedded framework: %w", err)
 				}
@@ -86,6 +91,9 @@ func inspectCode(ctx context.Context, app appInfo) ([]codeObject, error) {
 		if strings.EqualFold(filepath.Ext(p), ".dylib") {
 			if !frameworksDirectory(filepath.Dir(p), app.Path) {
 				return failure("Dynamic library must be embedded in a Frameworks directory")
+			}
+			if err = prepareLibraryArchitectures(p); err != nil {
+				return fmt.Errorf("Embedded dynamic library %s: %w", filepath.Base(p), err)
 			}
 			if err = inspectMachO(p, 6); err != nil {
 				return fmt.Errorf("Embedded dynamic library: %w", err)
@@ -120,6 +128,48 @@ func inspectCode(ctx context.Context, app appInfo) ([]codeObject, error) {
 		return objects[i].Path < objects[j].Path
 	})
 	return objects, nil
+}
+
+// Older injected frameworks contain armv7 alongside arm64. All supported phones
+// run arm64; discard obsolete 32-bit library slices in the extracted copy before
+// signing. Executable bundles still require every architecture to be supported.
+func prepareLibraryArchitectures(path string) error {
+	b, err := readLimited(path, 512<<20)
+	if err != nil {
+		return err
+	}
+	slices, err := machSlices(b)
+	if err != nil {
+		return err
+	}
+	legacy := false
+	var arm64 [][]byte
+	for _, slice := range slices {
+		if len(slice.Data) < 32 {
+			return failure("Truncated embedded library")
+		}
+		switch binary.LittleEndian.Uint32(slice.Data[4:]) {
+		case 12:
+			legacy = true
+		case 0x100000c:
+			arm64 = append(arm64, slice.Data)
+		default:
+			return failure("Embedded library contains an unsupported architecture")
+		}
+	}
+	if !legacy {
+		return nil
+	}
+	if len(arm64) != 1 {
+		return failure("Legacy universal library must contain one arm64 slice")
+	}
+	if err = validateMachOType(arm64[0], 6); err != nil {
+		return err
+	}
+	if err = os.WriteFile(path, arm64[0], 0600); err != nil {
+		return failure("Could not prepare arm64 library")
+	}
+	return nil
 }
 
 func frameworksDirectory(dir, main string) bool {

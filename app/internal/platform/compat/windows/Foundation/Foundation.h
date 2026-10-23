@@ -5,7 +5,10 @@
 #include <objc/NSObject.h>
 #include <stddef.h>
 
-@class NSString, NSURL;
+@class NSString, NSURL, NSError;
+typedef NSUInteger NSSearchPathDirectory;
+typedef NSUInteger NSSearchPathDomainMask;
+enum { NSApplicationSupportDirectory = 14, NSUserDomainMask = 1 };
 typedef struct {
     unsigned long state;
     id __unsafe_unretained *itemsPtr;
@@ -18,6 +21,15 @@ typedef struct {
                                    count:(NSUInteger)count;
 @end
 @interface NSString : NSObject
+@property (readonly) NSString *lastPathComponent;
+- (BOOL)isEqualToString:(NSString *)other;
+- (NSString *)stringByAppendingString:(NSString *)other;
+@end
+@interface NSArray<ObjectType> : NSObject
+@property (readonly) ObjectType firstObject;
+@end
+@interface NSURL : NSObject
+- (NSURL *)URLByAppendingPathComponent:(NSString *)path isDirectory:(BOOL)directory;
 @end
 @interface NSDictionary<KeyType, ObjectType> : NSObject <NSFastEnumeration>
 + (instancetype)dictionaryWithObjects:(const id [])objects
@@ -35,6 +47,8 @@ typedef struct {
 @end
 @interface NSFileManager : NSObject
 - (NSURL *)containerURLForSecurityApplicationGroupIdentifier:(NSString *)group;
+- (NSArray<NSURL *> *)URLsForDirectory:(NSSearchPathDirectory)directory inDomains:(NSSearchPathDomainMask)domains;
+- (BOOL)createDirectoryAtURL:(NSURL *)url withIntermediateDirectories:(BOOL)intermediates attributes:(NSDictionary *)attributes error:(NSError **)error;
 @end
 @interface NSUserDefaults : NSObject
 - (instancetype)initWithSuiteName:(NSString *)name;

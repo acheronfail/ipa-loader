@@ -5,6 +5,7 @@
 #include "fishhook.h"
 
 static NSDictionary<NSString *,NSString *> *appAliases;
+static NSDictionary<NSString *,NSString *> *localAppGroups;
 static NSDictionary<NSString *,NSString *> *keychainAliases;
 static OSStatus (*originalAdd)(CFDictionaryRef, CFTypeRef *);
 static OSStatus (*originalCopy)(CFDictionaryRef, CFTypeRef *);
@@ -24,6 +25,17 @@ static NSDictionary *safeAliases(id value) {
 @end
 @implementation NSFileManager (IPALoaderSharing)
 - (NSURL *)ipa_containerURLForSecurityApplicationGroupIdentifier:(NSString *)group {
+    NSString *local = group ? localAppGroups[group] : nil;
+    if (local) {
+        // Personal Teams cannot authorize app groups. Give the containing app
+        // a stable directory in its own sandbox without claiming shared access.
+        if (![local.lastPathComponent isEqualToString:local] || [local isEqualToString:@"."] || [local isEqualToString:@".."]) return nil;
+        NSURL *root = [[self URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask] firstObject];
+        if (!root) return nil;
+        NSURL *directory = [[root URLByAppendingPathComponent:@"IPALoaderAppGroups" isDirectory:YES] URLByAppendingPathComponent:local isDirectory:YES];
+        if (![self createDirectoryAtURL:directory withIntermediateDirectories:YES attributes:nil error:NULL]) return nil;
+        return directory;
+    }
     return [self ipa_containerURLForSecurityApplicationGroupIdentifier:(group ? appAliases[group] : nil) ?: group];
 }
 @end
@@ -33,6 +45,8 @@ static NSDictionary *safeAliases(id value) {
 @end
 @implementation NSUserDefaults (IPALoaderSharing)
 - (instancetype)ipa_initWithSuiteName:(NSString *)name {
+    NSString *local = name ? localAppGroups[name] : nil;
+    if (local) return [self ipa_initWithSuiteName:[@"org.ipaloader.localgroup." stringByAppendingString:local]];
     return [self ipa_initWithSuiteName:(name ? appAliases[name] : nil) ?: name];
 }
 @end
@@ -81,8 +95,9 @@ __attribute__((constructor)) static void initializeSharing(void) {
         id metadata = [NSBundle.mainBundle objectForInfoDictionaryKey:@"IPALoaderSharing"];
         if (![metadata isKindOfClass:NSDictionary.class]) return;
         appAliases = safeAliases(metadata[@"AppGroups"]);
+        localAppGroups = safeAliases(metadata[@"LocalAppGroups"]);
         keychainAliases = safeAliases(metadata[@"KeychainGroups"]);
-        if (appAliases.count) {
+        if (appAliases.count || localAppGroups.count) {
             method_exchangeImplementations(
                 class_getInstanceMethod(NSFileManager.class,@selector(containerURLForSecurityApplicationGroupIdentifier:)),
                 class_getInstanceMethod(NSFileManager.class,@selector(ipa_containerURLForSecurityApplicationGroupIdentifier:)));

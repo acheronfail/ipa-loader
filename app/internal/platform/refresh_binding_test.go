@@ -14,6 +14,8 @@ func TestRefreshGraphDoesNotSkipProvisionedBundles(t *testing.T) {
 	}{
 		{"main", "embedded.mobileprovision", false},
 		{"direct extension", "PlugIns/Widget.appex/embedded.mobileprovision", false},
+		{"modern extension", "Extensions/Migration.appex/embedded.mobileprovision", false},
+		{"nested modern extension", "Extensions/Migration.appex/Extensions/Child.appex/embedded.mobileprovision", true},
 		{"nested extension", "PlugIns/Widget.appex/PlugIns/Child.appex/embedded.mobileprovision", true},
 		{"watch app", "Watch/Companion.app/embedded.mobileprovision", true},
 		{"misplaced extension", "Resources/Widget.appex/embedded.mobileprovision", true},

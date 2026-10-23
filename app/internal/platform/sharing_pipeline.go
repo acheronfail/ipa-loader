@@ -99,7 +99,23 @@ func sharingFor(request sharingRequest, team, registration string, profile map[s
 	if len(prefixes) != 1 {
 		return sharingPlan{}, failure("Sharing profile has an ambiguous App ID prefix")
 	}
-	return planSharing(request, team, prefixes[0], registration, ctx.Registrations)
+	plan, err := planSharing(request, team, prefixes[0], registration, ctx.Registrations)
+	if err != nil {
+		return plan, err
+	}
+	if local, _ := profile["LocalProvision"].(bool); local {
+		plan.LocalAppGroups = plan.AppGroupAliases
+		plan.AppGroupAliases = map[string]string{}
+		plan.AppGroups = nil
+		// Personal Teams may authorize only the bundle's own keychain group.
+		// Keep explicit source queries working inside that authorized namespace.
+		self := prefixes[0] + "." + registration
+		for source := range plan.KeychainAliases {
+			plan.KeychainAliases[source] = self
+		}
+		plan.KeychainGroups = []string{self}
+	}
+	return plan, nil
 }
 
 func (e *engine) applySharing(path, executable string, profile map[string]any, entitlements map[string]any, plan sharingPlan, ctx *sharingContext) error {
@@ -155,7 +171,20 @@ func (e *engine) applySharing(path, executable string, profile map[string]any, e
 			}
 			return nil
 		}
-		if err = merge("AppGroups", plan.AppGroupAliases, plan.AppGroups); err != nil {
+		if len(plan.LocalAppGroups) > 0 {
+			previous, _ := m["AppGroups"].(map[string]any)
+			for source, value := range previous {
+				target, _ := value.(string)
+				local, ok := plan.LocalAppGroups[target]
+				if !ok {
+					local, ok = plan.LocalAppGroups[source]
+				}
+				if !ok {
+					return failure("Existing app group alias has no local storage mapping")
+				}
+				plan.LocalAppGroups[source] = local
+			}
+		} else if err = merge("AppGroups", plan.AppGroupAliases, plan.AppGroups); err != nil {
 			return err
 		}
 		if err = merge("KeychainGroups", plan.KeychainAliases, plan.KeychainGroups); err != nil {
@@ -163,6 +192,10 @@ func (e *engine) applySharing(path, executable string, profile map[string]any, e
 		}
 	}
 	info["IPALoaderSharing"] = map[string]any{"Version": 1, "AppGroups": plan.AppGroupAliases, "KeychainGroups": plan.KeychainAliases}
+	if len(plan.LocalAppGroups) > 0 {
+		info["IPALoaderSharing"].(map[string]any)["LocalAppGroups"] = plan.LocalAppGroups
+		e.emit("Free account: app-group storage and keychain aliases are local to this app; cross-extension sharing is unavailable")
+	}
 	encoded, err := plist.Marshal(info, plist.XMLFormat)
 	if err != nil {
 		return failure("Could not encode sharing metadata")
@@ -211,7 +244,10 @@ func sharingMetadata(info map[string]any) (bool, error) {
 	if version != uint64(1) && version != int64(1) && version != int(1) {
 		return false, failure("Existing sharing metadata uses an unsupported version")
 	}
-	for _, key := range []string{"AppGroups", "KeychainGroups"} {
+	for _, key := range []string{"AppGroups", "KeychainGroups", "LocalAppGroups"} {
+		if key == "LocalAppGroups" && m[key] == nil {
+			continue
+		}
 		aliases, ok := m[key].(map[string]any)
 		if !ok || len(aliases) > 256 {
 			return false, failure("Existing sharing aliases are invalid")

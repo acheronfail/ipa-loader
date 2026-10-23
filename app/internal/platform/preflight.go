@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strings"
 	"syscall"
 	"unicode/utf8"
@@ -26,12 +27,18 @@ var bundlePattern = regexp.MustCompile(`^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$`)
 
 type appInfo struct {
 	Path, Executable, BundleID, Version, Build string
+	ExtensionPoint                             string
 	Embedded                                   []codeObject
 	Sharing                                    sharingRequest
 	Networking                                 networkRequest
+	Capabilities                               capabilityRequest
 }
 
 func (a *appInfo) applyBundleIdentity(ids bundleIdentity) error {
+	return a.applyBundleMetadata(ids, "", "")
+}
+
+func (a *appInfo) applyBundleMetadata(ids bundleIdentity, version, build string) error {
 	bundle := ids.Installed
 	if !bundlePattern.MatchString(bundle) || len(bundle) > 255 {
 		return failure("Could not prepare an identifier for this account")
@@ -46,8 +53,16 @@ func (a *appInfo) applyBundleIdentity(ids bundleIdentity) error {
 		return err
 	}
 	_, hasALT := m["ALTBundleIdentifier"]
-	if bundle == ids.Original && a.BundleID == bundle && !hasALT {
+	versionChanged := version != "" && version != stringField(m, "CFBundleShortVersionString")
+	buildChanged := build != "" && build != stringField(m, "CFBundleVersion")
+	if bundle == ids.Original && a.BundleID == bundle && !hasALT && !versionChanged && !buildChanged {
 		return nil
+	}
+	if version != "" {
+		m["CFBundleShortVersionString"] = version
+	}
+	if build != "" {
+		m["CFBundleVersion"] = build
 	}
 	m["CFBundleIdentifier"] = bundle
 	if bundle == ids.Original {
@@ -219,6 +234,10 @@ func extractIPA(ctx context.Context, ipa, work string) (appInfo, error) {
 	if e != nil {
 		return a, e
 	}
+	a.Capabilities, e = readCapabilities(filepath.Join(a.Path, a.Executable))
+	if e != nil {
+		return a, e
+	}
 
 	return a, nil
 }
@@ -367,6 +386,7 @@ func signatureEntitlements(b []byte) (map[string]any, error) {
 	return xml, nil
 }
 func basicEntitlements(m map[string]any) error {
+	var unsupported []string
 	for k, v := range m {
 		switch k {
 		case "application-identifier", "com.apple.developer.team-identifier":
@@ -387,8 +407,17 @@ func basicEntitlements(m map[string]any) error {
 			// by each new profile; source entitlements are never copied wholesale.
 
 		default:
-			return fmt.Errorf("Input app has capabilities not supported by this signing path")
+			if _, supported := optionalCapabilityTypes[k]; !supported {
+				unsupported = append(unsupported, k)
+			}
 		}
+	}
+	if len(unsupported) != 0 {
+		sort.Strings(unsupported)
+		return fmt.Errorf("Input app has capabilities not supported by this signing path: %s", strings.Join(unsupported, ", "))
+	}
+	if _, err := requestedCapabilities(m); err != nil {
+		return err
 	}
 	_, err := requestedSharing(m)
 	return err

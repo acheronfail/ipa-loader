@@ -148,7 +148,7 @@ func profileAuthorizes(allowed, signed any) bool {
 	switch want := signed.(type) {
 	case string:
 		value, ok := allowed.(string)
-		return ok && authorizedID(value, want)
+		return ok && (value == "*" || authorizedID(value, want))
 	case bool:
 		if !want && allowed == nil {
 			return true

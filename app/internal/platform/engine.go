@@ -183,6 +183,46 @@ func (e *engine) provisionAppProfile(client requestClient, session *apple.Sessio
 	if !validText(appID) {
 		return nil, failure("Developer service returned an invalid App ID")
 	}
+	if len(appGroups) > 0 {
+		// Determine account type from an authenticated profile before attempting
+		// app-group portal operations, which Personal Teams cannot perform.
+		data, err := e.downloadAppProfile(client, session, team, appID)
+		if err != nil {
+			return nil, err
+		}
+		file, err := os.CreateTemp(e.work, "account-profile-*.mobileprovision")
+		if err != nil {
+			return nil, failure("Could not inspect provisioning account type")
+		}
+		path := file.Name()
+		defer os.Remove(path)
+		_, writeErr := file.Write(data)
+		closeErr := file.Close()
+		if writeErr != nil || closeErr != nil {
+			return nil, failure("Could not inspect provisioning account type")
+		}
+		decoded, err := e.decodeProfile(path)
+		if err != nil {
+			return nil, failure("Account provisioning profile CMS integrity did not verify")
+		}
+		p, err := dictionary(decoded)
+		if err != nil {
+			return nil, err
+		}
+		if teams := textList(p["TeamIdentifier"]); len(teams) != 1 || teams[0] != team {
+			return nil, failure("Account provisioning profile belongs to a different team")
+		}
+		if value, present := p["LocalProvision"]; present {
+			local, ok := value.(bool)
+			if !ok {
+				return nil, failure("Provisioning profile has an invalid account type")
+			}
+			if local {
+				e.emit("Free account: using app-local storage instead of shared app groups")
+				return data, nil
+			}
+		}
+	}
 	enabled := contains(textList(appRecord["enabledFeatures"]), "APG3427HIY") && mapField(appRecord, "features")["APG3427HIY"] == true
 	if err = e.provisionSharingGroups(client, session, team, appID, appGroups, enabled); err != nil {
 		return nil, err
@@ -196,8 +236,12 @@ func (e *engine) provisionAppProfile(client requestClient, session *apple.Sessio
 			}
 		}
 	}
+	return e.downloadAppProfile(client, session, team, appID)
+}
+
+func (e *engine) downloadAppProfile(client requestClient, session *apple.Session, team, appID string) ([]byte, error) {
 	e.emit("Downloading provisioning profile")
-	r, err = e.request(client, session, "downloadTeamProvisioningProfile", map[string]any{"appIdId": appID}, team)
+	r, err := e.request(client, session, "downloadTeamProvisioningProfile", map[string]any{"appIdId": appID}, team)
 	if err != nil {
 		return nil, err
 	}

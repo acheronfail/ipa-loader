@@ -11,8 +11,9 @@ type machSlice struct {
 	Offset uint64
 }
 
-// Preserve every slice for native codesign. Never silently select one, thin
-// input, or ignore an architecture that could hide unsupported capabilities.
+// Parse every slice and validate the complete architecture table. Executable
+// policy checks every slice; library preparation may explicitly discard obsolete
+// 32-bit ARM code before validating and signing the remaining arm64 code.
 func machSlices(b []byte) ([]machSlice, error) {
 	if len(b) < 4 {
 		return nil, failure("Truncated Mach-O header")
@@ -60,7 +61,8 @@ func machSlices(b []byte) ([]machSlice, error) {
 			return nil, failure("Invalid universal slice bounds or alignment")
 		}
 		data := b[offset : offset+size]
-		if binary.LittleEndian.Uint32(data) != 0xfeedfacf || binary.LittleEndian.Uint32(data[4:]) != cpu || binary.LittleEndian.Uint32(data[8:]) != subtype {
+		magic := binary.LittleEndian.Uint32(data)
+		if (magic != 0xfeedfacf && !(magic == 0xfeedface && cpu == 12)) || binary.LittleEndian.Uint32(data[4:]) != cpu || binary.LittleEndian.Uint32(data[8:]) != subtype {
 			return nil, failure("Universal architecture table disagrees with its slice")
 		}
 		key := uint64(cpu)<<32 | uint64(subtype)

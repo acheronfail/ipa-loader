@@ -12,8 +12,9 @@ import (
 )
 
 func inspectExtension(path string, parent appInfo) (appInfo, error) {
-	if filepath.Dir(path) != filepath.Join(parent.Path, "PlugIns") {
-		return appInfo{}, failure("App extensions must be in the main app's PlugIns directory")
+	dir := filepath.Dir(path)
+	if dir != filepath.Join(parent.Path, "PlugIns") && dir != filepath.Join(parent.Path, "Extensions") {
+		return appInfo{}, failure("App extensions must be in the main app's PlugIns or Extensions directory")
 	}
 	b, err := readLimited(filepath.Join(path, "Info.plist"), 1<<20)
 	if err != nil {
@@ -27,13 +28,18 @@ func inspectExtension(path string, parent appInfo) (appInfo, error) {
 	if !validText(a.Executable) || a.Executable == "." || a.Executable == ".." || filepath.Base(a.Executable) != a.Executable || strings.ContainsAny(a.Executable, "/\\:") || !bundlePattern.MatchString(a.BundleID) || len(a.BundleID) > 255 || !strings.HasPrefix(a.BundleID, parent.BundleID+".") || stringField(m, "CFBundlePackageType") != "XPC!" {
 		return a, failure("Unsupported app extension metadata or parent bundle identifier")
 	}
-	if a.Version != parent.Version || a.Build != parent.Build {
-		return a, failure("App extension version and build must match the containing app")
+	if !validText(a.Version) || !validText(a.Build) {
+		return a, failure("App extension version and build are missing or invalid")
 	}
-	extension, ok := m["NSExtension"].(map[string]any)
-	if !ok || !bundlePattern.MatchString(stringField(extension, "NSExtensionPointIdentifier")) {
+	key, point := "NSExtension", "NSExtensionPointIdentifier"
+	if dir == filepath.Join(parent.Path, "Extensions") {
+		key, point = "EXAppExtensionAttributes", "EXExtensionPointIdentifier"
+	}
+	extension, ok := m[key].(map[string]any)
+	if !ok || !bundlePattern.MatchString(stringField(extension, point)) {
 		return a, failure("App extension point is missing or invalid")
 	}
+	a.ExtensionPoint = stringField(extension, point)
 	if err = inspectMachO(filepath.Join(path, a.Executable), 2); err != nil {
 		return a, fmt.Errorf("App extension: %w", err)
 	}
@@ -42,6 +48,10 @@ func inspectExtension(path string, parent appInfo) (appInfo, error) {
 		return a, err
 	}
 	a.Sharing, err = readSharingRequest(filepath.Join(path, a.Executable))
+	if err != nil {
+		return a, err
+	}
+	a.Capabilities, err = readCapabilities(filepath.Join(path, a.Executable))
 	if err != nil {
 		return a, err
 	}
@@ -92,9 +102,15 @@ func (e *engine) prepareExtensions(app *appInfo, client requestClient, session *
 	if len(options) > 0 {
 		sharing = options[0]
 	}
+	var omitted []string
 	for i := range app.Embedded {
 		object := &app.Embedded[i]
 		if !object.Extension {
+			continue
+		}
+		if local, _ := parentProfile["LocalProvision"].(bool); local && object.ExtensionPoint == "com.apple.app-migration" {
+			e.emit("Skipping app migration extension for free account: " + filepath.Base(object.Path))
+			omitted = append(omitted, object.Path)
 			continue
 		}
 		e.emit("Provisioning app extension: " + filepath.Base(object.Path))
@@ -129,8 +145,18 @@ func (e *engine) prepareExtensions(app *appInfo, client requestClient, session *
 		if err = authorizeNetwork(p, entitlements, object.Networking); err != nil {
 			return err
 		}
+		e.applyCapabilities(object.Path, p, entitlements, object.Capabilities, map[string]string{parentIDs.Original: parentIDs.Installed, ids.Original: ids.Installed})
+		if object.ExtensionPoint == "com.apple.app-migration" && entitlements[migrationAccessKey] == nil {
+			// A migration extension cannot access the containing app without this
+			// entitlement. Leave the main app and its other extensions usable.
+			e.emit("Skipping app migration extension without authorized container access: " + filepath.Base(object.Path))
+			omitted = append(omitted, object.Path)
+			continue
+		}
 		extension := appInfo{Path: object.Path, BundleID: object.Identifier}
-		if err = extension.applyBundleIdentity(ids); err != nil {
+		// Repacked apps may contain extensions with independent versions. Align
+		// their metadata with the containing app before creating the new seal.
+		if err = extension.applyBundleMetadata(ids, app.Version, app.Build); err != nil {
 			return err
 		}
 		if err = e.applySharing(object.Path, object.Executable, p, entitlements, plan, sharing); err != nil {
@@ -146,5 +172,37 @@ func (e *engine) prepareExtensions(app *appInfo, client requestClient, session *
 		}
 		object.Identifier = ids.Installed
 	}
+	for _, path := range omitted {
+		if err := os.RemoveAll(path); err != nil {
+			return failure("Could not remove unsupported app migration extension")
+		}
+	}
+	if len(omitted) > 0 {
+		objects := app.Embedded[:0]
+		for _, object := range app.Embedded {
+			keep := true
+			for _, path := range omitted {
+				if object.Path == path || strings.HasPrefix(object.Path, path+string(filepath.Separator)) {
+					keep = false
+				}
+			}
+			if keep {
+				objects = append(objects, object)
+			}
+		}
+		app.Embedded = objects
+	}
 	return nil
+}
+
+func directExtensionPaths(root string) ([]string, error) {
+	var paths []string
+	for _, directory := range []string{"PlugIns", "Extensions"} {
+		matches, err := filepath.Glob(filepath.Join(root, directory, "*.appex"))
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, matches...)
+	}
+	return paths, nil
 }

@@ -2,11 +2,67 @@ package platform
 
 import (
 	"context"
+	"errors"
+	"howett.net/plist"
 	"reflect"
 	"testing"
 
 	"ipa-loader/app/internal/apple"
 )
+
+func TestAppGroupProvisioningChecksAuthenticatedAccountType(t *testing.T) {
+	for _, kind := range []string{"free", "paid", "foreign team", "malformed flag", "invalid CMS"} {
+		t.Run(kind, func(t *testing.T) {
+			p := map[string]any{"TeamIdentifier": []any{"TEAM"}, "LocalProvision": kind == "free"}
+			if kind == "foreign team" {
+				p["TeamIdentifier"] = []any{"OTHER"}
+			}
+			if kind == "malformed flag" {
+				p["LocalProvision"] = "true"
+			}
+			raw, _ := plist.Marshal(p, plist.XMLFormat)
+			e := newControllerTestEngine(context.Background(), t.TempDir())
+			e.decodeProfile = func(string) ([]byte, error) {
+				if kind == "invalid CMS" {
+					return nil, errors.New("bad CMS")
+				}
+				return raw, nil
+			}
+			var actions []string
+			client := portalFunc(func(_ context.Context, _ *apple.Session, action string, _ map[string]any, _ string) (map[string]any, error) {
+				actions = append(actions, action)
+				switch action {
+				case "listAppIds":
+					return map[string]any{"appIds": []any{map[string]any{"identifier": "org.example.app.TEAM", "appIdId": "APP", "enabledFeatures": []any{"APG3427HIY"}, "features": map[string]any{"APG3427HIY": true}}}}, nil
+				case "downloadTeamProvisioningProfile":
+					return map[string]any{"provisioningProfile": map[string]any{"encodedProfile": []byte("CMS")}}, nil
+				case "listApplicationGroups":
+					if kind != "paid" {
+						t.Fatal("non-paid or invalid profile attempted app-group provisioning")
+					}
+					return map[string]any{"applicationGroupList": []any{map[string]any{"identifier": "group.org.example.TEAM", "applicationGroup": "GROUP"}}}, nil
+				case "assignApplicationGroupToAppId":
+					return map[string]any{}, nil
+				default:
+					t.Fatalf("unexpected action %s", action)
+					return nil, nil
+				}
+			})
+			_, err := e.provisionAppProfile(client, &apple.Session{}, "TEAM", "org.example.app.TEAM", "group.org.example.TEAM")
+			valid := kind == "free" || kind == "paid"
+			if (err == nil) != valid {
+				t.Fatalf("account profile policy: %v", err)
+			}
+			if kind == "paid" {
+				if len(actions) != 5 {
+					t.Fatalf("paid provisioning incomplete: %v", actions)
+				}
+			} else if len(actions) != 2 {
+				t.Fatalf("unexpected account provisioning operations: %v", actions)
+			}
+		})
+	}
+}
 
 func TestSharingPortalReuseAndAssignment(t *testing.T) {
 	var actions []string

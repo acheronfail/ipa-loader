@@ -1,9 +1,70 @@
 package platform
 
 import (
+	"bytes"
 	"encoding/binary"
+	"os"
+	"path/filepath"
 	"testing"
 )
+
+func legacyLibraryFixture() []byte {
+	b := universalFixture(binary.BigEndian, false)
+	binary.BigEndian.PutUint32(b[8:], 12)
+	binary.BigEndian.PutUint32(b[12:], 9)
+	binary.LittleEndian.PutUint32(b[256:], 0xfeedface)
+	binary.LittleEndian.PutUint32(b[260:], 12)
+	binary.LittleEndian.PutUint32(b[264:], 9)
+	binary.BigEndian.PutUint32(b[32:], 0)
+	binary.LittleEndian.PutUint32(b[520:], 0)
+	binary.LittleEndian.PutUint32(b[524:], 6)
+	return b
+}
+
+func TestLegacyLibraryArchitecturePreparation(t *testing.T) {
+	for _, kind := range []string{"valid", "overlap", "mismatch", "encrypted arm64", "no arm64", "simulator"} {
+		t.Run(kind, func(t *testing.T) {
+			b := legacyLibraryFixture()
+			switch kind {
+			case "overlap":
+				binary.BigEndian.PutUint32(b[36:], 256)
+			case "mismatch":
+				binary.BigEndian.PutUint32(b[12:], 6)
+			case "encrypted arm64":
+				binary.LittleEndian.PutUint32(b[544:], 0x2c)
+				binary.LittleEndian.PutUint32(b[560:], 1)
+			case "no arm64":
+				binary.BigEndian.PutUint32(b[28:], 12)
+				binary.LittleEndian.PutUint32(b[512:], 0xfeedface)
+				binary.LittleEndian.PutUint32(b[516:], 12)
+			case "simulator":
+				binary.LittleEndian.PutUint32(b[552:], 7)
+			}
+			path := filepath.Join(t.TempDir(), "Legacy.dylib")
+			if err := os.WriteFile(path, b, 0600); err != nil {
+				t.Fatal(err)
+			}
+			err := prepareLibraryArchitectures(path)
+			if (err == nil) != (kind == "valid") {
+				t.Fatalf("unexpected preparation result: %v", err)
+			}
+			actual, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if kind == "valid" {
+				if !bytes.Equal(actual, b[512:]) {
+					t.Fatal("arm64 slice changed during extraction")
+				}
+			} else if !bytes.Equal(actual, b) {
+				t.Fatal("invalid library was modified")
+			}
+		})
+	}
+	if err := validateMachO(legacyLibraryFixture()); err == nil {
+		t.Fatal("legacy executable architectures accepted without library preparation")
+	}
+}
 
 func universalFixture(order binary.ByteOrder, wide bool) []byte {
 	first, second := make([]byte, 256), make([]byte, 256)

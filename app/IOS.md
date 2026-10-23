@@ -93,6 +93,26 @@ signing rather than skipping their members.
 
 ## IPA storage
 
+When re-signing an IPA, the loader keeps recognized optional capabilities only
+when the new provisioning profile authorizes them. Installation Details lists
+omitted capabilities; their related features (for example push notifications or
+associated domains) may be unavailable. Push notifications use the environment
+issued by the new profile. Unknown capabilities still produce an explicit error.
+Identity and packet-tunnel permissions are validated separately. Paid accounts
+use newly provisioned app groups and authorized keychain groups. Free accounts
+use private app-local directories/preferences for app-group requests and map
+keychain requests to the bundle's own authorized group. This permits installation
+without App Groups support, but storage is not shared with other apps/extensions.
+
+Both `PlugIns/` and ExtensionFoundation `Extensions/` bundles are supported.
+App migration container identifiers are mapped to the installed app identifier;
+if the extension's new profile does not authorize container access, that migration
+extension is excluded from the installation. Other extensions remain included.
+Free accounts omit the migration extension without registering an extra App ID.
+Extension versions are aligned with the containing app before signing. Older
+libraries containing 32-bit ARM and one arm64 slice are prepared using their
+arm64 slice. All preparation changes affect the extracted working copy only.
+
 Tap **+**, select an IPA in Files, review it, then install. **Keep IPA for
 Refresh** is optional and off by default; the review shows its size. A retained
 original is stored privately under `Library/Application Support/ipa-loader/apps`,
@@ -124,6 +144,17 @@ From `app/`, using the repository's dependency caches when needed:
 go test ./...
 go test -race ./internal/iosapp ./internal/accounts ./internal/platform ./internal/ui
 ```
+
+To exercise a local IPA through preparation, signing, verification and packaging
+with synthetic paid/free profiles (no Apple account or device calls):
+
+```sh
+IPA_LOADER_TEST_IPA=/absolute/path/to/app.ipa go test ./internal/platform -run TestLocalIPACompatibility -v
+```
+
+This optional check needs Xcode's iPhoneOS SDK when the app needs a sharing
+adapter. It verifies generated signatures/resources locally; it does not prove
+Apple profile issuance, installation or app behavior on a device.
 
 On macOS with a booted simulator:
 

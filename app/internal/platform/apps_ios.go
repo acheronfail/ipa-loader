@@ -66,11 +66,13 @@ func saveAppRecord(record iosAppRecord) error {
 }
 func appProfileDates(path string) (time.Time, error) {
 	paths := []string{filepath.Join(path, "embedded.mobileprovision")}
-	extensions, err := filepath.Glob(filepath.Join(path, "PlugIns", "*.appex", "embedded.mobileprovision"))
+	extensions, err := directExtensionPaths(path)
 	if err != nil {
 		return time.Time{}, err
 	}
-	paths = append(paths, extensions...)
+	for _, extension := range extensions {
+		paths = append(paths, filepath.Join(extension, "embedded.mobileprovision"))
+	}
 	var expiry time.Time
 	for _, profilePath := range paths {
 		raw, err := decodeProfile(profilePath)

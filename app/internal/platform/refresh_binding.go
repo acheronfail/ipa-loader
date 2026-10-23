@@ -112,7 +112,7 @@ func captureRefreshBinding(ctx context.Context, path string, certificate []byte)
 // Reject provisioning-bearing bundles outside the supported direct extension
 // graph instead of silently renewing only part of an installation.
 func refreshMemberPaths(root string) ([]string, error) {
-	extensions, err := filepath.Glob(filepath.Join(root, "PlugIns", "*.appex"))
+	extensions, err := directExtensionPaths(root)
 	if err != nil || len(extensions) > 31 {
 		return nil, errProfileRefreshUnsupported
 	}

@@ -1,9 +1,77 @@
 package platform
 
 import (
+	"context"
+	"howett.net/plist"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
+
+func TestFreeSharingFallbackSurvivesResigningAndPaidUpgrade(t *testing.T) {
+	work := t.TempDir()
+	root := filepath.Join(work, "Fixture.app")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		t.Fatal(err)
+	}
+	info, _ := plist.Marshal(map[string]any{"CFBundleIdentifier": "org.example.app.TEAM"}, plist.XMLFormat)
+	if err := os.WriteFile(filepath.Join(root, "Info.plist"), info, 0600); err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(root, "Fixture")
+	if err := os.WriteFile(executable, sharingMachO(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	adapter := filepath.Join(work, "adapter.dylib")
+	if err := os.WriteFile(adapter, library(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &sharingContext{Adapter: adapter, Registrations: map[string]string{"org.example.app": "org.example.app.TEAM"}}
+	request, err := requestedSharing(map[string]any{"application-identifier": "OLD.org.example.app", "com.apple.security.application-groups": []any{"group.org.example.shared"}, "keychain-access-groups": []any{"OLD.org.example.app", "OLD.org.example.sso"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := map[string]any{"LocalProvision": true, "ApplicationIdentifierPrefix": []any{"PREFIX"}, "Entitlements": map[string]any{"keychain-access-groups": []any{"PREFIX.org.example.app.TEAM"}}}
+	plan, err := sharingFor(request, "TEAM", "org.example.app.TEAM", profile, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.AppGroups) != 0 || len(plan.AppGroupAliases) != 0 || plan.LocalAppGroups["group.org.example.shared"] != "group.org.example.shared.TEAM" || plan.KeychainAliases["OLD.org.example.sso"] != "PREFIX.org.example.app.TEAM" {
+		t.Fatalf("free storage plan: %+v", plan)
+	}
+	e := newEngine(context.Background(), work)
+	signing := map[string]any{}
+	if err = e.applySharing(root, executable, profile, signing, plan, ctx); err != nil {
+		t.Fatal(err)
+	}
+	if signing["com.apple.security.application-groups"] != nil {
+		t.Fatal("free signing claimed app-group access")
+	}
+	request, err = readSharingRequest(executable)
+	if err != nil || !reflect.DeepEqual(request.AppGroups, []string{"group.org.example.shared"}) {
+		t.Fatalf("local group requests lost: %+v %v", request, err)
+	}
+	plan, err = sharingFor(request, "TEAM", "org.example.app.TEAM", profile, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = e.applySharing(root, executable, profile, map[string]any{}, plan, ctx); err != nil {
+		t.Fatal("free re-signing: ", err)
+	}
+	profile["LocalProvision"] = false
+	mapField(profile, "Entitlements")["com.apple.security.application-groups"] = []any{"group.org.example.shared.TEAM"}
+	plan, err = sharingFor(request, "TEAM", "org.example.app.TEAM", profile, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.LocalAppGroups) != 0 || len(plan.AppGroups) != 1 {
+		t.Fatal("paid upgrade retained free fallback")
+	}
+	if err = e.applySharing(root, executable, profile, map[string]any{}, plan, ctx); err != nil {
+		t.Fatal("paid upgrade: ", err)
+	}
+}
 
 func TestSharingPlanPreservesMainExtensionRelationships(t *testing.T) {
 	makePlan := func(app, registration string) sharingPlan {

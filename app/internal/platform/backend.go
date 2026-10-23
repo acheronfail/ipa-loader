@@ -147,6 +147,7 @@ func sideload(ctx context.Context, client *apple.Client, session *apple.Session,
 	if err = authorizeNetwork(p, entitlements, app.Networking); err != nil {
 		return result, err
 	}
+	e.applyCapabilities(app.Path, p, entitlements, app.Capabilities, map[string]string{ids.Original: ids.Installed})
 	if ids.Installed == ids.Original {
 		notify(.5, "Paid profile: keeping the original installed app identifier")
 	} else {

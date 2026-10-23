@@ -2,6 +2,7 @@ package platform
 
 import (
 	"encoding/binary"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -19,7 +20,35 @@ func readSharingRequest(path string) (sharingRequest, error) {
 	if err != nil {
 		return sharingRequest{}, err
 	}
-	return requestedSharing(ent)
+	request, err := requestedSharing(ent)
+	if err != nil {
+		return request, err
+	}
+	// Local fallback groups are deliberately absent from signed entitlements.
+	// Recover their requests from validated managed metadata when re-signing.
+	dir := filepath.Dir(path)
+	if ext := filepath.Ext(dir); ext == ".app" || ext == ".appex" {
+		if raw, readErr := readLimited(filepath.Join(dir, "Info.plist"), 1<<20); readErr == nil {
+			info, err := dictionary(raw)
+			if err != nil {
+				return request, err
+			}
+			managed, err := sharingMetadata(info)
+			if err != nil {
+				return request, err
+			}
+			if managed {
+				local, _ := mapField(info, "IPALoaderSharing")["LocalAppGroups"].(map[string]any)
+				for source := range local {
+					if !contains(request.AppGroups, source) {
+						request.AppGroups = append(request.AppGroups, source)
+					}
+				}
+				sort.Strings(request.AppGroups)
+			}
+		}
+	}
+	return request, nil
 }
 
 func thinEntitlements(b []byte) (map[string]any, error) {
@@ -69,6 +98,7 @@ type sharingRequest struct {
 type sharingPlan struct {
 	AppGroups, KeychainGroups        []string
 	AppGroupAliases, KeychainAliases map[string]string
+	LocalAppGroups                   map[string]string
 }
 
 func sharingStrings(value any) ([]string, error) {

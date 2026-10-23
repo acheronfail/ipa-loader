@@ -8,8 +8,19 @@ import (
 	"howett.net/plist"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestUnsupportedCapabilitiesAreNamed(t *testing.T) {
+	err := basicEntitlements(map[string]any{
+		"com.example.unsupported.z": true,
+		"com.example.unsupported.a": true,
+	})
+	if err == nil || !strings.HasSuffix(err.Error(), "com.example.unsupported.a, com.example.unsupported.z") {
+		t.Fatalf("unsupported capabilities were not identified in stable order: %v", err)
+	}
+}
 
 func thin() []byte {
 	b := make([]byte, 56)
@@ -187,7 +198,7 @@ func TestExistingEntitlementsCannotBeDiscarded(t *testing.T) {
 	if e := validateSignature(super([]uint32{5}, [][]byte{blob(0xfade7171, xml)})); e != nil {
 		t.Fatal(e)
 	}
-	basic["aps-environment"] = "development"
+	basic["com.example.unsupported-capability"] = true
 	xml, _ = plist.Marshal(basic, plist.XMLFormat)
 	if validateSignature(super([]uint32{5}, [][]byte{blob(0xfade7171, xml)})) == nil {
 		t.Fatal("capability silently discarded")
