@@ -41,11 +41,17 @@ func packageBytes(t *testing.T, version string, builtin bool) []byte {
 		t.Fatal(err)
 	}
 	if builtin {
+		meta, err = plist.Marshal(map[string]any{"CFBundleIdentifier": "org.ipaloader.ios.tunnel", "CFBundleShortVersionString": version, "CFBundleVersion": "42"}, plist.XMLFormat)
+		if err != nil {
+			t.Fatal(err)
+		}
 		f, err = z.Create("Payload/IPA Loader.app/PlugIns/IPALoaderTunnel.appex/Info.plist")
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Write(meta)
+		if _, err = f.Write(meta); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err = z.Close(); err != nil {
 		t.Fatal(err)
