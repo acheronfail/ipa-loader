@@ -81,7 +81,8 @@ func Run() {
 			return platform.Sideload(ctx, client, s, team, path, d, p)
 		},
 		RefreshTeam: platform.IOSRefreshTeam, ChooseIPA: iosnative.ChooseIPA,
-		ConfirmIPA: func(info *ipa.Info) (bool, bool, error) { return iosnative.ConfirmImport(info) },
+		ConfirmIPA:         func(info *ipa.Info) (bool, bool, error) { return iosnative.ConfirmImport(info) },
+		ExtensionSelection: platform.LoadExtensionSelection,
 		Ask: func(ch apple.Challenge) (string, error) {
 			if ch.Kind == "phone" {
 				options := make([]string, len(ch.Phones))

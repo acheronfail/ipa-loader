@@ -20,6 +20,7 @@ import (
 
 	"howett.net/plist"
 	"ipa-loader/app/internal/apple"
+	"ipa-loader/app/internal/ipa"
 	"ipa-loader/app/internal/signing"
 )
 
@@ -32,12 +33,24 @@ func TestLocalIPACompatibility(t *testing.T) {
 	}
 	for _, local := range []bool{false, true} {
 		t.Run(map[bool]string{false: "paid", true: "free"}[local], func(t *testing.T) {
-			testLocalIPACompatibility(t, input, local)
+			testLocalIPACompatibility(t, input, local, nil)
 		})
 	}
 }
 
-func testLocalIPACompatibility(t *testing.T, input string, local bool) {
+func TestLocalIPAWithoutExtensions(t *testing.T) {
+	input := os.Getenv("IPA_LOADER_TEST_IPA")
+	if input == "" {
+		t.Skip("set IPA_LOADER_TEST_IPA to test a local IPA")
+	}
+	for _, local := range []bool{false, true} {
+		t.Run(map[bool]string{false: "paid", true: "free"}[local], func(t *testing.T) {
+			testLocalIPACompatibility(t, input, local, &ipa.ExtensionSelection{Included: []string{}})
+		})
+	}
+}
+
+func testLocalIPACompatibility(t *testing.T, input string, local bool, selection *ipa.ExtensionSelection) {
 	hash := func() [32]byte {
 		f, err := os.Open(input)
 		if err != nil {
@@ -54,7 +67,7 @@ func testLocalIPACompatibility(t *testing.T, input string, local bool) {
 	}
 	before := hash()
 	work := t.TempDir()
-	ctx := context.Background()
+	ctx := WithExtensionSelection(context.Background(), selection)
 	app, err := extractIPA(ctx, input, work)
 	if err != nil {
 		t.Fatal(err)

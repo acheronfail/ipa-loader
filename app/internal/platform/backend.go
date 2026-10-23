@@ -4,6 +4,7 @@ import (
 	"context"
 	"howett.net/plist"
 	"ipa-loader/app/internal/apple"
+	ipainfo "ipa-loader/app/internal/ipa"
 	"os"
 	"path/filepath"
 	"time"
@@ -41,6 +42,24 @@ func sideload(ctx context.Context, client *apple.Client, session *apple.Session,
 	if ctx.Err() != nil {
 		return result, ctx.Err()
 	}
+	info, err := ipainfo.Inspect(ipaPath)
+	if err != nil {
+		return result, err
+	}
+	selection := ExtensionSelection(ctx)
+	if selection == nil {
+		root, configErr := e.configDir()
+		if configErr != nil {
+			return result, configErr
+		}
+		selection, err = loadExtensionSelection(root, session.Username, teamID, info.BundleID)
+		if err != nil {
+			return result, err
+		}
+	}
+	info.Selection = selection
+	selection = info.SelectedExtensions()
+	ctx = WithExtensionSelection(ctx, selection)
 	app, err := extractIPA(ctx, ipaPath, work)
 	if err != nil {
 		return result, err
@@ -192,5 +211,14 @@ func sideload(ctx context.Context, client *apple.Client, session *apple.Session,
 		return result, err
 	}
 	err = e.installNative(app, device, &result, notify)
+	if result.Installed {
+		root, saveErr := e.configDir()
+		if saveErr == nil {
+			saveErr = saveExtensionSelection(root, session.Username, teamID, info.BundleID, selection)
+		}
+		if saveErr != nil {
+			result.CompletionMessage = "App installed, but extension choices could not be saved. Review them before reinstalling."
+		}
+	}
 	return result, err
 }

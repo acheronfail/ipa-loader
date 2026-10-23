@@ -149,6 +149,53 @@ func TestNativeImportConfirmsAndInstallsExactlyOnce(t *testing.T) {
 		t.Fatal("temporary import not cleaned up")
 	}
 }
+
+func TestImportRestoresExtensionChoiceAndPassesReviewSelection(t *testing.T) {
+	for _, excludeAll := range []bool{false, true} {
+		path := importedFixture(t)
+		raw, err := os.ReadFile(filepath.Join("..", "..", "..", "fixtures", "ipas", "ipa-loader-extension-v1-unsigned.ipa"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(path, raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+		var selected *ipa.ExtensionSelection
+		installs := 0
+		c := signedInController(Services{
+			ChooseIPA: func() (string, error) { return path, nil },
+			ExtensionSelection: func(account, team, bundle string) (*ipa.ExtensionSelection, error) {
+				if account != "owner@example.invalid" || team != "DEFAULT" {
+					t.Fatal("wrong preference scope")
+				}
+				return &ipa.ExtensionSelection{Included: []string{}}, nil
+			},
+			ConfirmIPA: func(info *ipa.Info) (bool, bool, error) {
+				if len(info.Extensions) == 0 || info.AppIDCount() != 1 {
+					t.Fatal("saved all-off choice was not restored before review")
+				}
+				if !excludeAll {
+					info.Selection = nil
+				}
+				selected = info.SelectedExtensions()
+				return true, false, nil
+			},
+			Device: func(context.Context) (platform.Device, error) { return platform.Device{}, nil },
+			Install: func(ctx context.Context, _ *apple.Session, _, _ string, _ platform.Device, _ func(platform.Progress)) (platform.Result, error) {
+				installs++
+				actual := platform.ExtensionSelection(ctx)
+				if actual == nil || len(actual.Included) != len(selected.Included) {
+					t.Fatal("review choice did not reach install")
+				}
+				return platform.Result{Installed: true}, nil
+			},
+		})
+		c.Handle(Action{Kind: "import"})
+		if installs != 1 || c.Snapshot().Failed {
+			t.Fatalf("review failed: %+v", c.Snapshot())
+		}
+	}
+}
 func TestFallbackRequiresMatchingOriginalIPA(t *testing.T) {
 	path := importedFixture(t)
 	installs := 0

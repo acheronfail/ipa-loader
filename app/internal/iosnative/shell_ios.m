@@ -812,11 +812,19 @@ char *ipa_ios_prompt(const char *title, const char *message,
 @property(nonatomic, copy) NSDictionary *info;
 @property(nonatomic) dispatch_semaphore_t done;
 @property(nonatomic) BOOL accepted, finished, keepIPA;
+@property(nonatomic, strong) NSMutableSet<NSString *> *includedExtensions;
 @end
 @implementation IPAImport
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.title = @"Install App";
+  self.includedExtensions = [NSMutableSet set];
+  NSDictionary *selection = [self.info[@"Selection"] isKindOfClass:NSDictionary.class] ? self.info[@"Selection"] : nil;
+  NSArray *remembered = selection[@"Included"] ?: @[];
+  for (NSDictionary *extension in self.info[@"Extensions"]) {
+    NSString *identifier = extension[@"BundleID"];
+    if (!selection || [remembered containsObject:identifier]) [self.includedExtensions addObject:identifier];
+  }
   self.tableView.rowHeight = UITableViewAutomaticDimension;
   self.tableView.estimatedRowHeight = 64;
   self.navigationItem.leftBarButtonItem =
@@ -825,25 +833,44 @@ char *ipa_ios_prompt(const char *title, const char *message,
       ipa_ios_bar_button(@"Install", self, @selector(install), YES);
 }
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-  return 2;
+  return [self.info[@"Extensions"] count] ? 3 : 2;
 }
 - (NSInteger)tableView:(UITableView *)tableView
     numberOfRowsInSection:(NSInteger)section {
-  return section == 0 ? 3 : 1;
+  if (section == 0) return 4;
+  if (section == 1 && [self.info[@"Extensions"] count]) return [self.info[@"Extensions"] count];
+  return 1;
+}
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+  return section == 1 && [self.info[@"Extensions"] count] ? @"Extensions" : nil;
 }
 - (NSString *)tableView:(UITableView *)tableView
     titleForFooterInSection:(NSInteger)section {
   if (section == 0)
     return [NSString
-        stringWithFormat:@"Install on this iPhone using %@.",
+        stringWithFormat:@"Install on this iPhone using %@. Existing App IDs are reused.",
                          ipaShellState[@"Username"] ?: @"your Apple Account"];
+  if (section == 1 && [self.info[@"Extensions"] count])
+    return @"One App ID per included extension. Turn off extensions you don't need; their features won't be available. Choices are remembered for refreshes. Unsupported extensions may be skipped.";
   return @"Saves an extra copy for full signing. When off, profile refresh "
          @"still works; full signing may ask you to choose the original IPA "
          @"again.";
 }
 - (UITableViewCell *)tableView:(UITableView *)tableView
          cellForRowAtIndexPath:(NSIndexPath *)path {
-  if (path.section == 1) {
+  if (path.section == 1 && [self.info[@"Extensions"] count]) {
+    NSDictionary *extension = self.info[@"Extensions"][path.row];
+    NSString *summary = extension[@"Summary"] ?: @"App extension";
+    UITableViewCell *cell = ipaTextCell(extension[@"Name"], [NSString stringWithFormat:@"%@\n%@",summary,extension[@"BundleID"]],NO,YES);
+    UISwitch *toggle = [UISwitch new];
+    toggle.on = [self.includedExtensions containsObject:extension[@"BundleID"]];
+    toggle.tag = path.row;
+    toggle.accessibilityLabel = extension[@"Name"];
+    [toggle addTarget:self action:@selector(changeExtension:) forControlEvents:UIControlEventValueChanged];
+    cell.accessoryView = toggle;
+    return cell;
+  }
+  if (path.section != 0) {
     NSString *size = [NSByteCountFormatter
         stringFromByteCount:[self.info[@"Size"] longLongValue]
                  countStyle:NSByteCountFormatterCountStyleFile];
@@ -904,6 +931,11 @@ char *ipa_ios_prompt(const char *title, const char *message,
     ]];
     return cell;
   }
+  if (path.row == 3) {
+    NSUInteger count = self.includedExtensions.count;
+    NSString *cost = count ? [NSString stringWithFormat:@"%lu total · 1 app + %lu %@",(unsigned long)count+1,(unsigned long)count,count == 1 ? @"extension" : @"extensions"] : @"1 total · app only";
+    return ipaTextCell(@"App IDs",cost,NO,YES);
+  }
   return ipaTextCell(path.row == 1 ? @"Version" : @"Bundle Identifier",
                      path.row == 1
                          ? [NSString stringWithFormat:@"%@ (%@)",
@@ -911,6 +943,12 @@ char *ipa_ios_prompt(const char *title, const char *message,
                                                       self.info[@"Build"]]
                          : self.info[@"BundleID"],
                      NO, YES);
+}
+- (void)changeExtension:(UISwitch *)toggle {
+  NSString *identifier = self.info[@"Extensions"][toggle.tag][@"BundleID"];
+  if (toggle.on) [self.includedExtensions addObject:identifier];
+  else [self.includedExtensions removeObject:identifier];
+  [self.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:3 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
 }
 - (void)changeKeepIPA:(UISwitch *)toggle {
   self.keepIPA = toggle.on;
@@ -939,9 +977,9 @@ char *ipa_ios_prompt(const char *title, const char *message,
   [self finish:NO];
 }
 @end
-int ipa_ios_confirm_import(const char *json) {
+char *ipa_ios_confirm_import(const char *json) {
   if (NSThread.isMainThread)
-    return 0;
+    return NULL;
   NSString *text = @(json);
   IPAImport *view =
       [[IPAImport alloc] initWithStyle:UITableViewStyleInsetGrouped];
@@ -963,7 +1001,10 @@ int ipa_ios_confirm_import(const char *json) {
     [root presentViewController:nav animated:YES completion:nil];
   });
   dispatch_semaphore_wait(view.done, DISPATCH_TIME_FOREVER);
-  return view.accepted ? (view.keepIPA ? 2 : 1) : 0;
+  NSDictionary *decision = @{@"Accepted":@(view.accepted), @"KeepIPA":@(view.keepIPA), @"Selection":@{@"Included":[view.includedExtensions.allObjects sortedArrayUsingSelector:@selector(compare:)] ?: @[]}};
+  NSData *data = [NSJSONSerialization dataWithJSONObject:decision options:0 error:NULL];
+  NSString *response = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+  return response ? strdup(response.UTF8String) : NULL;
 }
 @interface IPALoaderApplication : UIResponder <UIApplicationDelegate>
 @property(nonatomic, strong) UIWindow *window;

@@ -11,6 +11,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 	"howett.net/plist"
 	"io"
+	ipainfo "ipa-loader/app/internal/ipa"
 	"math"
 	"os"
 	"path"
@@ -152,6 +153,18 @@ func zipPlan(files []*zip.File) (string, error) {
 	panic("unreachable")
 }
 func extractIPA(ctx context.Context, ipa, work string) (appInfo, error) {
+	omitted := []string{}
+	if selection := ExtensionSelection(ctx); selection != nil {
+		info, err := ipainfo.Inspect(ipa)
+		if err != nil {
+			return appInfo{}, err
+		}
+		for _, extension := range info.Extensions {
+			if !selection.Includes(extension.BundleID) {
+				omitted = append(omitted, extension.Path)
+			}
+		}
+	}
 	z, e := zip.OpenReader(ipa)
 	if e != nil {
 		return appInfo{}, failure("Could not open the IPA archive")
@@ -161,9 +174,18 @@ func extractIPA(ctx context.Context, ipa, work string) (appInfo, error) {
 	if e != nil {
 		return appInfo{}, e
 	}
+	excluded := func(name string) bool {
+		relative := strings.TrimPrefix(strings.TrimSuffix(name, "/"), prefix+"/")
+		for _, extension := range omitted {
+			if relative == extension || strings.HasPrefix(relative, extension+"/") {
+				return true
+			}
+		}
+		return false
+	}
 	var expanded uint64
 	for _, f := range z.File {
-		if strings.HasPrefix(f.Name, prefix+"/") {
+		if strings.HasPrefix(f.Name, prefix+"/") && !excluded(f.Name) {
 			expanded += f.UncompressedSize64
 		}
 	}
@@ -175,6 +197,9 @@ func extractIPA(ctx context.Context, ipa, work string) (appInfo, error) {
 			return appInfo{}, ctx.Err()
 		}
 		if f.Name != prefix+"/" && !strings.HasPrefix(f.Name, prefix+"/") {
+			continue
+		}
+		if excluded(f.Name) {
 			continue
 		}
 		dest := filepath.Join(work, filepath.FromSlash(f.Name))

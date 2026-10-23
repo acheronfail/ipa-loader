@@ -50,6 +50,7 @@ type Services struct {
 	Teams                        func(context.Context, *apple.Session) ([]apple.Team, error)
 	Devices                      func(context.Context) ([]platform.Device, error)
 	Sideload                     func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
+	ExtensionSelection           func(string, string, string) (*ipa.ExtensionSelection, error)
 }
 
 func NativeServices() Services {
@@ -60,6 +61,7 @@ func NativeServices() Services {
 		Sideload: func(ctx context.Context, s *apple.Session, t, p string, d platform.Device, progress func(platform.Progress)) (platform.Result, error) {
 			return platform.Sideload(ctx, client, s, t, p, d, progress)
 		}}
+	services.ExtensionSelection = platform.LoadExtensionSelection
 	return services
 }
 
@@ -70,6 +72,11 @@ type Screen struct {
 	teams               []apple.Team
 	devices             []platform.Device
 	selected            *ipa.Info
+	extensionOptions    *fyne.Container
+	extensionChecks     []*widget.Check
+	extensionCost       *widget.Label
+	extensionChoiceErr  error
+	extensionDialog     dialog.Dialog
 	busy, discovering   bool
 	allowanceGeneration uint64
 	certificateRecovery *certificateRecovery
@@ -166,7 +173,7 @@ func New(window fyne.Window, services Services) *Screen {
 	singleLine(s.accountName)
 	s.accountQuota = caption("")
 	singleLine(s.accountQuota)
-	s.team = widget.NewSelect(nil, func(string) { s.dismissCertificateRecovery(); s.updateQuota(); s.readiness() })
+	s.team = widget.NewSelect(nil, func(string) { s.dismissCertificateRecovery(); s.updateQuota(); s.loadExtensionChoices(); s.readiness() })
 	s.team.PlaceHolder = "Choose a developer team"
 	s.team.Hide()
 	s.icon = canvas.NewImageFromResource(placeholderIcon)
@@ -230,6 +237,8 @@ func New(window fyne.Window, services Services) *Screen {
 	heading.SizeName = theme.SizeNameSubHeadingText
 	header := container.NewBorder(nil, nil, nil, control(36, s.accountButton), container.NewHBox(headerLogo, heading))
 	appRow := appPickerLayout(s.icon, s.appName, s.appDetail, s.choose)
+	s.extensionOptions = container.NewVBox()
+	s.extensionOptions.Hide()
 	s.appPanel = surface(appRow)
 	installTask := container.NewTabItem("Install an IPA", s.appPanel)
 	setupIcon := canvas.NewImageFromResource(Brand)
@@ -380,6 +389,13 @@ func (s *Screen) setBusy(b bool) {
 			entry.Enable()
 		}
 	}
+	for _, check := range s.extensionChecks {
+		if b {
+			check.Disable()
+		} else {
+			check.Enable()
+		}
+	}
 	buttons := []*widget.Button{s.signIn, s.choose, s.refresh, s.forgetAccount, s.continueAccount, s.manageCertificates, s.accountButton, s.switchAccountButton}
 	buttons = append(buttons, s.accountRemoveButtons...)
 	for _, button := range buttons {
@@ -425,7 +441,7 @@ func (s *Screen) readiness() {
 			s.loader.Disable()
 		}
 	}
-	ready := !s.busy && s.session != nil && s.selected != nil && s.team.SelectedIndex() >= 0 && s.device.SelectedIndex() >= 0 && s.device.SelectedIndex() < len(s.devices)
+	ready := !s.busy && s.session != nil && s.selected != nil && s.extensionChoiceErr == nil && s.team.SelectedIndex() >= 0 && s.device.SelectedIndex() >= 0 && s.device.SelectedIndex() < len(s.devices)
 	if ready {
 		s.install.Enable()
 	} else {
@@ -450,6 +466,8 @@ func (s *Screen) showReadyStatus() {
 		s.setStatus("Ready to set up IPA Loader on your iPhone.")
 	case s.selected == nil:
 		s.setStatus("Choose an IPA file to install.")
+	case s.extensionChoiceErr != nil:
+		s.setStatus(s.extensionChoiceErr.Error())
 	default:
 		s.setStatus("Ready to install on your iPhone.")
 	}
@@ -764,10 +782,11 @@ func (s *Screen) loadIPA(path string) {
 
 func (s *Screen) showIPA(info *ipa.Info) {
 	s.selected = info
+	s.loadExtensionChoices()
 	s.taskTabs.SelectIndex(0)
 	s.choose.SetText("Change IPA…")
 	s.appName.SetText(info.Name)
-	s.appDetail.SetText(info.Version + " · build " + info.Build + "\n" + info.BundleID)
+	s.updateSelectedAppDetail()
 	if len(info.Icon) > 0 {
 		s.icon.Resource = fyne.NewStaticResource("selected-app.png", info.Icon)
 	} else {
@@ -787,9 +806,42 @@ func (s *Screen) showIPA(info *ipa.Info) {
 	s.readiness()
 }
 
-func (s *Screen) sideload() { s.runInstall(false) }
+func (s *Screen) sideload() {
+	if s.busy || s.selected == nil || s.extensionChoiceErr != nil {
+		return
+	}
+	if len(s.selected.Extensions) == 0 {
+		s.runInstall(false)
+		return
+	}
+	if s.extensionDialog != nil {
+		s.extensionDialog.Show()
+		return
+	}
+	choices := container.NewVScroll(s.extensionOptions)
+	choices.SetMinSize(fyne.NewSize(400, 180))
+	name := wrap(s.selected.Name)
+	name.TextStyle.Bold = true
+	singleLine(name)
+	content := column(12, name, s.extensionCost, choices,
+		wrap("One App ID for the app, plus one per extension. Existing IDs are reused."),
+		wrap("Turn off features you don't need. Your choices are remembered for refreshes."))
+	s.extensionDialog = dialog.NewCustomConfirm("Install App", "Install", "Cancel", content, func(confirmed bool) {
+		s.extensionDialog = nil
+		if confirmed {
+			s.runInstall(false)
+		}
+	}, s.Window)
+	current := s.extensionDialog
+	current.SetOnClosed(func() {
+		if s.extensionDialog == current {
+			s.extensionDialog = nil
+		}
+	})
+	s.extensionDialog.Show()
+}
 func (s *Screen) runInstall(loader bool) {
-	if s.busy || s.session == nil || (!loader && s.selected == nil) || (loader && s.services.Bootstrap == nil) {
+	if s.busy || s.session == nil || (!loader && (s.selected == nil || s.extensionChoiceErr != nil)) || (loader && s.services.Bootstrap == nil) {
 		return
 	}
 	teamIndex, deviceIndex := s.team.SelectedIndex(), s.device.SelectedIndex()
@@ -808,6 +860,9 @@ func (s *Screen) runInstall(loader bool) {
 	}
 	s.allowanceGeneration++
 	ctx, cancel := context.WithCancel(context.Background())
+	if !loader {
+		ctx = platform.WithExtensionSelection(ctx, s.selected.SelectedExtensions())
+	}
 	s.cancel = cancel
 	s.logs = nil
 	s.details.Hide()

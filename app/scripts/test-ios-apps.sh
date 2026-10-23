@@ -44,6 +44,9 @@ xcrun simctl install "$1" "$bundle"
 xcrun simctl launch --console "$1" "$identifier" >"$test_root/output" 2>&1
 cat "$test_root/output"
 grep -Fq "PASS: cancellation quietly dismisses the progress sheet" "$test_root/output"
+xcrun simctl launch --console "$1" "$identifier" --extension-checks >"$test_root/output" 2>&1
+cat "$test_root/output"
+grep -Fq "PASS: extension selection updates App ID cost and returns an explicit empty selection" "$test_root/output"
 for variant in builtin localdevvpn; do
  if [ "$variant" = localdevvpn ]; then
   xcrun simctl launch --console "$1" "$identifier" --connection-checks --localdevvpn >"$test_root/output" 2>&1
@@ -61,3 +64,11 @@ grep -Fq "PASS: update discovery, account and VPN gating, actions and progress f
 xcrun simctl launch --console "$1" "$identifier" --update-feedback-checks >"$test_root/output" 2>&1
 cat "$test_root/output"
 grep -Fq "PASS: update results persist beside the action with timestamps, retry and checking feedback" "$test_root/output"
+
+if [ -n "${IPA_LOADER_IOS_REVIEW_DIR:-}" ]; then
+ mkdir -p "$IPA_LOADER_IOS_REVIEW_DIR"
+ xcrun simctl launch "$1" "$identifier" --preview --review
+ sleep 2
+ xcrun simctl io "$1" screenshot "$IPA_LOADER_IOS_REVIEW_DIR/install-extensions.png"
+ xcrun simctl terminate "$1" "$identifier"
+fi

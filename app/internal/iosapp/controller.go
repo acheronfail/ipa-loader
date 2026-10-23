@@ -42,29 +42,30 @@ type State struct {
 	Certificates                                            []apple.DevelopmentCertificate
 }
 type Services struct {
-	CheckUpdate     func(context.Context) (*iosupdate.Release, error)
-	DownloadUpdate  func(context.Context, iosupdate.Release, func(int64, int64)) (string, error)
-	InstallUpdate   func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
-	UpdateTeam      func() string
-	Accounts        *accounts.Store
-	Login           func(context.Context, string, string, func(apple.Challenge) (string, error)) (*apple.Session, error)
-	Teams           func(context.Context, *apple.Session) ([]apple.Team, error)
-	Device          func(context.Context) (platform.Device, error)
-	Refresh         func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
-	Install         func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
-	RefreshTeam     func(string) string
-	ChooseIPA       func() (string, error)
-	ConfirmIPA      func(*ipa.Info) (bool, bool, error)
-	Ask             func(apple.Challenge) (string, error)
-	ConfirmFallback func(string) bool
-	Connection      func() error
-	Certificates    func(context.Context, *apple.Session, string) ([]apple.DevelopmentCertificate, error)
-	Revoke          func(context.Context, *apple.Session, string, apple.DevelopmentCertificate) error
-	Publish         func(State)
-	ResetVPN        func()
-	VPNState        func() (bool, bool)
-	SetVPN          func(bool) error
-	Reload          func()
+	CheckUpdate        func(context.Context) (*iosupdate.Release, error)
+	DownloadUpdate     func(context.Context, iosupdate.Release, func(int64, int64)) (string, error)
+	InstallUpdate      func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
+	UpdateTeam         func() string
+	Accounts           *accounts.Store
+	Login              func(context.Context, string, string, func(apple.Challenge) (string, error)) (*apple.Session, error)
+	Teams              func(context.Context, *apple.Session) ([]apple.Team, error)
+	Device             func(context.Context) (platform.Device, error)
+	Refresh            func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
+	Install            func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
+	RefreshTeam        func(string) string
+	ChooseIPA          func() (string, error)
+	ConfirmIPA         func(*ipa.Info) (bool, bool, error)
+	ExtensionSelection func(string, string, string) (*ipa.ExtensionSelection, error)
+	Ask                func(apple.Challenge) (string, error)
+	ConfirmFallback    func(string) bool
+	Connection         func() error
+	Certificates       func(context.Context, *apple.Session, string) ([]apple.DevelopmentCertificate, error)
+	Revoke             func(context.Context, *apple.Session, string, apple.DevelopmentCertificate) error
+	Publish            func(State)
+	ResetVPN           func()
+	VPNState           func() (bool, bool)
+	SetVPN             func(bool) error
+	Reload             func()
 }
 type Controller struct {
 	mu              sync.Mutex
@@ -511,8 +512,9 @@ func (c *Controller) operate(id string) {
 	var err error
 	path := ""
 	retain := false
+	var selection *ipa.ExtensionSelection
 	if id == "" {
-		path, retain, err = c.importIPA(ctx, "", team)
+		path, retain, selection, err = c.importIPA(ctx, "", team)
 	}
 	if err == nil && (id != "" || path != "") {
 		c.progress(platform.Progress{Message: "Connecting to this iPhone…"})
@@ -522,12 +524,12 @@ func (c *Controller) operate(id string) {
 			if id != "" {
 				result, err = c.services.Refresh(ctx, session, team, id, device, c.progress)
 			} else {
-				result, err = c.services.Install(platform.WithIOSPackageRetention(ctx, retain), session, team, path, device, c.progress)
+				result, err = c.services.Install(platform.WithExtensionSelection(platform.WithIOSPackageRetention(ctx, retain), selection), session, team, path, device, c.progress)
 			}
 			if errors.Is(err, platform.ErrRefreshNeedsIPA) && ctx.Err() == nil && c.services.ConfirmFallback != nil && c.services.ConfirmFallback(id) {
-				path, retain, err = c.importIPA(ctx, id, team)
+				path, retain, selection, err = c.importIPA(ctx, id, team)
 				if err == nil && path != "" {
-					result, err = c.services.Install(platform.WithIOSPackageRetention(ctx, retain), session, team, path, device, c.progress)
+					result, err = c.services.Install(platform.WithExtensionSelection(platform.WithIOSPackageRetention(ctx, retain), selection), session, team, path, device, c.progress)
 				} else if err == nil {
 					err = context.Canceled
 				}
@@ -556,13 +558,13 @@ func (c *Controller) operate(id string) {
 		c.services.Reload()
 	}
 }
-func (c *Controller) importIPA(ctx context.Context, expected, team string) (string, bool, error) {
+func (c *Controller) importIPA(ctx context.Context, expected, team string) (string, bool, *ipa.ExtensionSelection, error) {
 	path, err := c.services.ChooseIPA()
 	if err != nil {
-		return path, false, err
+		return path, false, nil, err
 	}
 	if path == "" {
-		return "", false, context.Canceled
+		return "", false, nil, context.Canceled
 	}
 	keep := false
 	defer func() {
@@ -572,28 +574,35 @@ func (c *Controller) importIPA(ctx context.Context, expected, team string) (stri
 		}
 	}()
 	if err = ctx.Err(); err != nil {
-		return "", false, err
+		return "", false, nil, err
 	}
 	info, err := ipa.Inspect(path)
 	if err != nil {
-		return "", false, err
+		return "", false, nil, err
 	}
 	// Installed paid/free bundle IDs can differ from the original IPA's ID.
 	if expected != "" && expected != info.BundleID && expected != info.BundleID+"."+team {
-		return "", false, errors.New("Choose the original IPA for this app.")
+		return "", false, nil, errors.New("Choose the original IPA for this app.")
+	}
+	if c.services.ExtensionSelection != nil {
+		session, _ := c.credentials()
+		info.Selection, err = c.services.ExtensionSelection(session.Username, team, info.BundleID)
+		if err != nil {
+			return "", false, nil, err
+		}
 	}
 	confirmed, retain, err := c.services.ConfirmIPA(info)
 	if err != nil {
-		return "", false, err
+		return "", false, nil, err
 	}
 	if !confirmed {
-		return "", false, context.Canceled
+		return "", false, nil, context.Canceled
 	}
 	if err = ctx.Err(); err != nil {
-		return "", false, err
+		return "", false, nil, err
 	}
 	keep = true
-	return path, retain, nil
+	return path, retain, info.SelectedExtensions(), nil
 }
 func (c *Controller) connection() {
 	ctx, ok := c.begin(false, "account", "")

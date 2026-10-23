@@ -119,6 +119,19 @@ original is stored privately under `Library/Application Support/ipa-loader/apps`
 not Documents. Disabling retention removes a previous managed copy of that app
 after a successful install. The user's source file remains untouched.
 
+The install review lists the IPA's extensions with switches and a live App ID
+count: one for the app plus one per included extension. Existing IDs are reused;
+this is the total required, not necessarily newly registered IDs. Turning off an
+extension removes its feature from the installation. Desktop installs show the
+same choices in an Install App dialog when the IPA contains extensions.
+
+Choices are saved after a confirmed installation for that Apple Account, team
+and original app identifier. Full-signing refreshes reuse them with either a
+retained IPA or an original IPA selected again. New extensions in later IPAs
+stay off until selected. Profile-only refreshes retain the installed extension
+set. Excluded extensions are not extracted, inspected as executable code, or
+registered for new App IDs; the original IPA is retained unchanged.
+
 Confirmed installs clean up temporary extracted workspaces. Uncertain installs
 retain the material needed to reconcile the submitted operation. Cancellation
 before submission dismisses the sheet without presenting an error.

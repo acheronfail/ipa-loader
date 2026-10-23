@@ -5,7 +5,16 @@
 
 static NSInteger inventoryReads, refreshRequests, importRequests;
 static BOOL importReturned, importAccepted;
-extern int ipa_ios_confirm_import(const char *json);
+extern char *ipa_ios_confirm_import(const char *json);
+static NSDictionary *lastImportDecision;
+static int confirmImport(NSString *json) {
+  char *response = ipa_ios_confirm_import(json.UTF8String);
+  if (!response) return 0;
+  NSDictionary *decision = [NSJSONSerialization JSONObjectWithData:[@(response) dataUsingEncoding:NSUTF8StringEncoding] options:0 error:NULL];
+  free(response);
+  lastImportDecision = decision;
+  return [decision[@"Accepted"] boolValue] ? ([decision[@"KeepIPA"] boolValue] ? 2 : 1) : 0;
+}
 extern char *ipa_ios_connection_settings(int builtin, const char *address,
                                          int *failed);
 static NSDictionary *sample;
@@ -113,6 +122,11 @@ static NSString *importJSON(void) {
     @"Version" : @"1.0",
     @"Build" : @"15",
     @"Size" : @(3LL << 30),
+    @"Extensions" : @[
+      @{@"Name":@"Safari", @"BundleID":@"org.ipaloader.sample.safari", @"Summary":@"Safari extension"},
+      @{@"Name":@"Widgets", @"BundleID":@"org.ipaloader.sample.widgets", @"Summary":@"Home Screen widgets"}
+    ],
+    @"Selection" : @{@"Included":@[@"org.ipaloader.sample.safari"]},
     @"Icon" : [UIImagePNGRepresentation(image) base64EncodedStringWithOptions:0]
   };
   NSData *data = [NSJSONSerialization dataWithJSONObject:info
@@ -234,12 +248,14 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
           if ([NSProcessInfo.processInfo.arguments containsObject:@"--review"])
             dispatch_async(
                 dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-                  ipa_ios_confirm_import(importJSON().UTF8String);
+                  confirmImport(importJSON());
                 });
           if ([NSProcessInfo.processInfo.arguments
                   containsObject:@"--progress"])
             publish(YES, YES, @"1 of 2 · Sample\nChecking signing profile…");
         });
+  } else if ([NSProcessInfo.processInfo.arguments containsObject:@"--extension-checks"]) {
+    [self runExtensionChecks];
   } else if ([NSProcessInfo.processInfo.arguments
                  containsObject:@"--update-feedback-checks"]) {
     [self runUpdateFeedbackChecks];
@@ -254,6 +270,34 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
   } else
     [self runChecks];
   return YES;
+}
+- (void)runExtensionChecks {
+  publish(YES,NO,@"");
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW,200*NSEC_PER_MSEC),dispatch_get_main_queue(),^{
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{
+      int accepted = confirmImport(importJSON());
+      dispatch_async(dispatch_get_main_queue(),^{
+        NSCAssert(accepted == 1, @"Extension review did not confirm without IPA retention");
+        NSCAssert([lastImportDecision[@"Selection"][@"Included"] count] == 0, @"Explicitly excluding all extensions was lost");
+        NSLog(@"PASS: extension selection updates App ID cost and returns an explicit empty selection");
+        exit(0);
+      });
+    });
+    waitForUI(^BOOL { return ipaTabs.presentedViewController != nil; },^{
+      UINavigationController *nav=(UINavigationController *)ipaTabs.presentedViewController;
+      UITableViewController *review=(UITableViewController *)nav.topViewController;
+      [review loadViewIfNeeded];
+      UITableViewCell *row=[review.tableView.dataSource tableView:review.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
+      UISwitch *toggle=(UISwitch *)row.accessoryView;
+      NSCAssert(toggle.on,@"Saved extension selection was not restored");
+      toggle.on=NO;
+      [toggle sendActionsForControlEvents:UIControlEventValueChanged];
+      UITableViewCell *cost=[review.tableView.dataSource tableView:review.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:3 inSection:0]];
+      NSCAssert([cost.detailTextLabel.text containsString:@"1 total"],@"Incorrect App ID cost");
+      UIButton *install=(UIButton *)review.navigationItem.rightBarButtonItem.customView;
+      [install sendActionsForControlEvents:UIControlEventTouchUpInside];
+    });
+  });
 }
 - (void)runUpdateFeedbackChecks {
   dispatch_after(
@@ -713,7 +757,7 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
               @"replacing the tab hierarchy");
         dispatch_async(
             dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-              int accepted = ipa_ios_confirm_import(importJSON().UTF8String);
+              int accepted = confirmImport(importJSON());
               dispatch_async(dispatch_get_main_queue(), ^{
                 importAccepted = accepted != 0;
                 importReturned = YES;
@@ -740,11 +784,19 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
                       icon.clipsToBounds && icon.layer.cornerRadius > 10,
                   @"Large source icon was not constrained and rounded");
         NSCAssert([review.tableView.dataSource
-                      numberOfSectionsInTableView:review.tableView] == 2,
+                      numberOfSectionsInTableView:review.tableView] == 3,
                   @"Storage choice has no separate section");
+        UITableViewCell *safari = [review.tableView.dataSource tableView:review.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
+        UITableViewCell *widgets = [review.tableView.dataSource tableView:review.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:1 inSection:1]];
+        NSCAssert([(UISwitch *)safari.accessoryView isOn] && ![(UISwitch *)widgets.accessoryView isOn], @"Remembered extension choices were not restored");
+        UISwitch *include = (UISwitch *)safari.accessoryView;
+        include.on = NO;
+        [include sendActionsForControlEvents:UIControlEventValueChanged];
+        UITableViewCell *cost = [review.tableView.dataSource tableView:review.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:3 inSection:0]];
+        NSCAssert([cost.detailTextLabel.text containsString:@"1 total"], @"App ID cost did not update when an extension was excluded");
         UITableViewCell *storage = [review.tableView.dataSource
                         tableView:review.tableView
-            cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:1]];
+            cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:2]];
         UISwitch *keep = (UISwitch *)storage.accessoryView;
         NSCAssert([keep isKindOfClass:UISwitch.class] && !keep.on,
                   @"IPA retention is not opt-in");

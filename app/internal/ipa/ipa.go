@@ -22,6 +22,8 @@ import (
 type Info struct {
 	Path, Name, BundleID, Version, Build string
 	Icon                                 []byte
+	Extensions                           []Extension `json:"Extensions,omitempty"`
+	Selection                            *ExtensionSelection
 }
 
 func read(f *zip.File, limit int64) ([]byte, error) {
@@ -108,6 +110,57 @@ func Inspect(filename string) (*Info, error) {
 	if info.BundleID == "" || info.Version == "" || info.Build == "" {
 		return nil, errors.New("The IPA is missing its app identifier or version")
 	}
+	ids := map[string]bool{strings.ToLower(info.BundleID): true}
+	for _, f := range z.File {
+		if !strings.HasPrefix(f.Name, base) {
+			continue
+		}
+		relative := strings.TrimPrefix(f.Name, base)
+		parts := strings.Split(relative, "/")
+		if len(parts) != 3 || (parts[0] != "PlugIns" && parts[0] != "Extensions") || !strings.EqualFold(path.Ext(parts[1]), ".appex") || parts[2] != "Info.plist" {
+			continue
+		}
+		if len(info.Extensions) >= 64 {
+			return nil, errors.New("This IPA contains too many app extensions")
+		}
+		raw, err := read(f, 1<<20)
+		if err != nil {
+			return nil, err
+		}
+		var metadata map[string]any
+		if _, err = plist.Unmarshal(raw, &metadata); err != nil {
+			return nil, errors.New("An app extension's Info.plist could not be read")
+		}
+		text := func(key string) string {
+			value, _ := metadata[key].(string)
+			if len(value) > 512 || strings.ContainsAny(value, "\r\n\x00") {
+				return ""
+			}
+			return strings.TrimSpace(value)
+		}
+		id := text("CFBundleIdentifier")
+		if id == "" || ids[strings.ToLower(id)] {
+			return nil, errors.New("App extensions must have unique bundle identifiers")
+		}
+		ids[strings.ToLower(id)] = true
+		name := text("CFBundleDisplayName")
+		if name == "" {
+			name = text("CFBundleName")
+		}
+		if name == "" {
+			name = strings.TrimSuffix(parts[1], path.Ext(parts[1]))
+		}
+		key, point := "NSExtension", "NSExtensionPointIdentifier"
+		if parts[0] == "Extensions" {
+			key, point = "EXAppExtensionAttributes", "EXExtensionPointIdentifier"
+		}
+		attributes, _ := metadata[key].(map[string]any)
+		identifier, _ := attributes[point].(string)
+		extension := Extension{Name: name, BundleID: id, Path: path.Join(parts[:2]...), Point: identifier}
+		extension.Summary = extension.Detail()
+		info.Extensions = append(info.Extensions, extension)
+	}
+	sort.Slice(info.Extensions, func(i, j int) bool { return info.Extensions[i].Path < info.Extensions[j].Path })
 	declared := []string{}
 	var gather func(any)
 	gather = func(v any) {
