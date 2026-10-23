@@ -121,8 +121,25 @@ func (e *engine) installStaged(app appInfo, device Device, result *Result, notif
 		}
 	})
 	result.InstallSubmitted = result.InstallSubmitted || submitted
+	var rejection *mobiledevice.InstallationRejectionError
+	rejected := errors.As(upgradeErr, &rejection)
+	if rejected {
+		// Device descriptions may contain private paths and identifiers. Retain
+		// them in the private work directory, never in the UI error or progress.
+		diagnostic, diagnosticErr := os.OpenFile(filepath.Join(e.work, "installation-rejection.plist"), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if diagnosticErr == nil {
+			diagnosticErr = rejection.WriteDiagnostics(diagnostic)
+			closeErr := diagnostic.Close()
+			if diagnosticErr == nil {
+				diagnosticErr = closeErr
+			}
+		}
+		if diagnosticErr != nil {
+			upgradeErr = fmt.Errorf("%w (could not save private device diagnostics)", upgradeErr)
+		}
+	}
 	record.MayHaveSubmitted = result.InstallSubmitted
-	record.Terminal = upgradeErr == nil
+	record.Terminal = upgradeErr == nil || rejected
 	if saveErr := save(); saveErr != nil && upgradeErr == nil {
 		return failure("Could not update private installation recovery state")
 	}
@@ -140,6 +157,10 @@ func (e *engine) installStaged(app appInfo, device Device, result *Result, notif
 
 func nativeInstallFailure(err error, submitted bool) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	var rejection *mobiledevice.InstallationRejectionError
+	if errors.As(err, &rejection) {
 		return err
 	}
 	if errors.Is(err, mobiledevice.ErrUnavailable) {

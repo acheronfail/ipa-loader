@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -135,6 +136,39 @@ func TestInstallationRejectionRedactsDeviceText(t *testing.T) {
 	err = installationRejection(map[string]any{"Error": "private@example.invalid", "ErrorDescription": "private/path"})
 	if strings.Contains(err.Error(), "private") {
 		t.Fatal("unknown error leaked")
+	}
+}
+
+func TestInstallationRejectionRetainsPrivateDiagnostics(t *testing.T) {
+	message := map[string]any{"Error": "PackageExtractionFailed", "ErrorDescription": "private@example.invalid /private/device/path"}
+	err := installationRejection(message)
+	var rejection *InstallationRejectionError
+	if !errors.As(err, &rejection) || !strings.Contains(err.Error(), "extract") {
+		t.Fatal("device rejection lost its type or useful message")
+	}
+	if strings.Contains(fmt.Sprintf("%v %#v", err, err), "private") {
+		t.Fatal("private response leaked through error formatting")
+	}
+	var diagnostic bytes.Buffer
+	if err := rejection.WriteDiagnostics(&diagnostic); err != nil {
+		t.Fatal(err)
+	}
+	var response map[string]any
+	if _, err := plist.Unmarshal(diagnostic.Bytes(), &response); err != nil || response["ErrorDescription"] != message["ErrorDescription"] || response["Error"] != message["Error"] {
+		t.Fatal("private diagnostics lost the device rejection", err)
+	}
+}
+
+func TestWrappedStorageRejectionHasActionablePrivateMessage(t *testing.T) {
+	for _, description := range []string{
+		"copyfile of /private/device/path failed: No space left on device",
+		"This app can’t be installed because there isn’t enough space. private@example.invalid",
+		"This app can't be installed because there isn't enough space. /private/path",
+	} {
+		err := installationRejection(map[string]any{"Error": "APIInternalError", "ErrorDescription": description})
+		if !strings.Contains(err.Error(), "iPhone Storage") || strings.Contains(err.Error(), "private") {
+			t.Fatal("lost storage guidance or exposed private device text")
+		}
 	}
 }
 

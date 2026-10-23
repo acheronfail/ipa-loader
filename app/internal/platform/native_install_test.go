@@ -15,6 +15,7 @@ import (
 
 type stagedFake struct {
 	failUpload, failUpgrade bool
+	rejectUpgrade           bool
 	removed                 int
 }
 
@@ -32,6 +33,9 @@ func (f *stagedFake) Upload(_ context.Context, _ string, r io.Reader, total int6
 }
 func (f *stagedFake) Upgrade(_ context.Context, _ string, _ int64, p ...func(mobiledevice.InstallProgress)) (bool, error) {
 	p[0](mobiledevice.InstallProgress{Submitted: true, Percent: 5})
+	if f.rejectUpgrade {
+		return true, &mobiledevice.InstallationRejectionError{}
+	}
 	if f.failUpgrade {
 		return true, context.Canceled
 	}
@@ -41,7 +45,7 @@ func (f *stagedFake) Remove(context.Context, string) error { f.removed++; return
 func (*stagedFake) Close()                                 {}
 
 func TestNativeInstallStagingLifecycle(t *testing.T) {
-	for _, kind := range []string{"success", "upload cancelled", "observation cancelled", "inventory mismatch"} {
+	for _, kind := range []string{"success", "upload cancelled", "observation cancelled", "inventory mismatch", "device rejection"} {
 		t.Run(kind, func(t *testing.T) {
 			work := testPrivateTempDir(t)
 			archive := filepath.Join(work, "signed.ipa")
@@ -64,7 +68,7 @@ func TestNativeInstallStagingLifecycle(t *testing.T) {
 				}
 				return map[string]any{"apps": []any{map[string]any{"bundleIdentifier": "org.example.owned", "version": "1", "bundleVersion": build}}}, nil
 			}
-			fake := &stagedFake{failUpload: kind == "upload cancelled", failUpgrade: kind == "observation cancelled"}
+			fake := &stagedFake{failUpload: kind == "upload cancelled", failUpgrade: kind == "observation cancelled", rejectUpgrade: kind == "device rejection"}
 			result := Result{}
 			completed := false
 			err = e.installStaged(appInfo{BundleID: "org.example.owned", Version: "1", Build: "8"}, Device{UDID: "private-phone"}, &result, func(f float64, _ string) { completed = completed || f == 1 }, archive, fake)
@@ -86,6 +90,16 @@ func TestNativeInstallStagingLifecycle(t *testing.T) {
 			}
 			if uncertain && (!record.MayHaveSubmitted || record.Terminal) {
 				t.Fatal("lost uncertainty")
+			}
+			if kind == "device rejection" {
+				if !record.Terminal || !record.Cleaned || strings.Contains(err.Error(), "Reconnect") {
+					t.Fatal("explicit rejection was treated as a connection loss")
+				}
+				path := filepath.Join(work, "installation-rejection.plist")
+				info, statErr := os.Stat(path)
+				if statErr != nil || info.Size() == 0 || !privateFile(path, info) {
+					t.Fatal("device rejection diagnostics missing or not private", statErr)
+				}
 			}
 			info, _ := os.Stat(filepath.Join(work, "device-staging.json"))
 			if !privateFile(filepath.Join(work, "device-staging.json"), info) {

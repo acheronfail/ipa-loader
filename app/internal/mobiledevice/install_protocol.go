@@ -26,10 +26,31 @@ var errReceiveTimeout = errors.New("device receive poll timed out")
 
 var installCodePattern = regexp.MustCompile(`(?i)\b0xe800[0-9a-f]{4}\b`)
 
+// InstallationRejectionError is a terminal device rejection. Its public message
+// is redacted; the full response is available only for private diagnostics.
+type InstallationRejectionError struct {
+	response map[string]any
+}
+
+func (e *InstallationRejectionError) Error() string    { return installationRejectionReason(e.response) }
+func (e *InstallationRejectionError) GoString() string { return e.Error() }
+
+func (e *InstallationRejectionError) WriteDiagnostics(w io.Writer) error {
+	response := e.response
+	if response == nil {
+		response = map[string]any{}
+	}
+	return plist.NewEncoder(w).Encode(response)
+}
+
 // Keep diagnostics useful without displaying device paths, account names or
 // arbitrary ErrorDescription text. Only known status names and numeric codes
 // cross the device-response boundary.
 func installationRejection(message map[string]any) error {
+	return &InstallationRejectionError{response: message}
+}
+
+func installationRejectionReason(message map[string]any) string {
 	reason := "The iPhone rejected this IPA"
 	switch message["Error"] {
 	case "ApplicationVerificationFailed":
@@ -38,6 +59,10 @@ func installationRejection(message map[string]any) error {
 		reason = "The iPhone could not verify an app bundle"
 	case "PackageInspectionFailed":
 		reason = "The iPhone could not inspect the IPA package"
+	case "PackageExtractionFailed":
+		reason = "The iPhone could not extract the IPA package"
+	case "InsufficientStorage":
+		reason = "The iPhone does not have enough free storage to install this app"
 	case "DeviceOSVersionTooLow":
 		reason = "This app requires a newer iOS version"
 	case "MaximumNumberOfAppsForFreeAccount":
@@ -48,9 +73,16 @@ func installationRejection(message map[string]any) error {
 		reason = "App installation is restricted on this iPhone"
 	}
 	if description, ok := message["ErrorDescription"].(string); ok {
+		lowerDescription := strings.ToLower(description)
+		// Installation coordination can wrap ENOSPC in APIInternalError rather
+		// than the dedicated InsufficientStorage error. Match fixed phrases only;
+		// the description also contains private device paths and identifiers.
+		if strings.Contains(lowerDescription, "no space left on device") || strings.Contains(lowerDescription, "there isn’t enough space") || strings.Contains(lowerDescription, "there isn't enough space") {
+			reason = "The iPhone does not have enough free storage to install this app. Free space in Settings > General > iPhone Storage, then retry"
+		}
 		// iOS sometimes wraps the free-account app limit in ApplicationVerificationFailed.
 		// Recognize it without exposing the installed-app identifiers in the description.
-		if strings.Contains(strings.ToLower(description), "maximum number of installed apps using a free developer profile") {
+		if strings.Contains(lowerDescription, "maximum number of installed apps using a free developer profile") {
 			reason = "The iPhone has reached its three-app free-account limit. Free a developer-app slot, then retry"
 		}
 		if code := installCodePattern.FindString(description); code != "" {
@@ -60,7 +92,7 @@ func installationRejection(message map[string]any) error {
 	if code, ok := message["ErrorDetail"].(uint64); ok && code != 0 {
 		reason += fmt.Sprintf(" (device error %d)", code)
 	}
-	return errors.New(reason + "; its installation was not confirmed")
+	return reason
 }
 
 func receiveExact(ctx context.Context, service installService, buffer []byte) error {
@@ -142,7 +174,11 @@ func runUpgrade(ctx context.Context, service installService, path string, callba
 		// Never surface untrusted ErrorDescription text (which can include device
 		// paths and account identifiers) in the user-facing error.
 		if value, exists := message["Error"]; exists {
-			if text, ok := value.(string); !ok || text != "" {
+			text, ok := value.(string)
+			if !ok {
+				return submitted, errors.New("The iPhone returned an invalid installation error")
+			}
+			if text != "" {
 				return submitted, installationRejection(message)
 			}
 		}
