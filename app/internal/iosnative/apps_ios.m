@@ -371,7 +371,8 @@ static NSNumber *ipaDismissedOperation;
   BOOL busy = [state[@"Busy"] boolValue], failed = [state[@"Failed"] boolValue];
   NSString *kind = state[@"Operation"];
   self.title =
-      [kind isEqual:@"install"]
+      [kind isEqual:@"update"] ? @"Update IPA Loader"
+      : [kind isEqual:@"install"]
           ? @"Install App"
           : ([kind isEqual:@"refreshall"] ? @"Refresh All" : @"Refresh App");
   NSString *name = @"App";
@@ -379,12 +380,13 @@ static NSNumber *ipaDismissedOperation;
     if ([app[@"BundleID"] isEqual:state[@"Target"]])
       name = app[@"Name"];
   self.heading.text =
-      busy ? ([kind isEqual:@"refreshall"]
-                  ? @"Refreshing your apps"
-                  : ([kind isEqual:@"install"]
-                         ? @"Installing app"
-                         : [@"Refreshing " stringByAppendingString:name]))
-           : (failed ? @"Needs attention" : @"Done");
+      [kind isEqual:@"update"] && busy ? @"Updating IPA Loader"
+      : busy ? ([kind isEqual:@"refreshall"]
+                    ? @"Refreshing your apps"
+                    : ([kind isEqual:@"install"]
+                           ? @"Installing app"
+                           : [@"Refreshing " stringByAppendingString:name]))
+             : (failed ? @"Needs attention" : @"Done");
   self.message.text = state[@"Message"];
   self.message.textColor =
       failed ? UIColor.systemRedColor : UIColor.secondaryLabelColor;
@@ -551,8 +553,11 @@ static NSNumber *ipaDismissedOperation;
   NSNumber *identifier = state[@"OperationID"] ?: @0;
   if ([ipaDismissedOperation isEqual:identifier])
     return;
+  UIViewController *presenter = [kind isEqual:@"update"]
+                                    ? ipaTabs.selectedViewController
+                                    : self.navigationController;
   if (!ipaProgress || ![ipaProgress.identifier isEqual:identifier]) {
-    if (self.navigationController.presentedViewController)
+    if (presenter.presentedViewController)
       return;
     ipaProgress = [IPAProgress new];
     ipaProgress.identifier = identifier;
@@ -566,9 +571,7 @@ static NSNumber *ipaDismissedOperation;
     ];
     nav.sheetPresentationController.prefersGrabberVisible = YES;
     nav.presentationController.delegate = ipaProgress;
-    [self.navigationController presentViewController:nav
-                                            animated:YES
-                                          completion:nil];
+    [presenter presentViewController:nav animated:YES completion:nil];
   }
   [ipaProgress apply:state];
 }

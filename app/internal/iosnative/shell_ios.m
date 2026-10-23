@@ -183,13 +183,13 @@ static IPACertificates *ipaCertificatesView;
     return signedIn ? 3 : 1;
   if (section == 1)
     return signedIn ? 3 : 2;
-  return 0;
+  return [ipaShellState[@"UpdateVersion"] length] ? 2 : 1;
 }
 - (NSString *)tableView:(UITableView *)tableView
     titleForHeaderInSection:(NSInteger)section {
   return section == 0   ? @"Apple Account"
          : section == 1 ? @"Connection & Signing"
-                        : nil;
+                        : @"IPA Loader Updates";
 }
 - (NSString *)tableView:(UITableView *)tableView
     titleForFooterInSection:(NSInteger)section {
@@ -221,11 +221,16 @@ static IPACertificates *ipaCertificatesView;
   if (section == 2) {
     NSDictionary *info = NSBundle.mainBundle.infoDictionary;
     return [NSString
-        stringWithFormat:@"Free accounts usually need to refresh every 7 days. "
-                         @"If IPA Loader expires, reinstall it using your "
-                         @"computer.\n\nIPA Loader %@ (%@)",
-                         info[@"CFBundleShortVersionString"] ?: @"—",
-                         info[@"CFBundleVersion"] ?: @"—"];
+        stringWithFormat:
+            @"%@\n\nFree accounts usually need to refresh every 7 days. "
+            @"If IPA Loader expires, reinstall it using your "
+            @"computer.\n\nIPA Loader %@ (%@)",
+            ipaShellState[@"UpdateMessage"]
+                ?: @"Checks GitHub automatically when you open IPA Loader. "
+                   @"Updates require your original Apple Account and a "
+                   @"connected local VPN.",
+            info[@"CFBundleShortVersionString"] ?: @"—",
+            info[@"CFBundleVersion"] ?: @"—"];
   }
   return nil;
 }
@@ -294,6 +299,68 @@ static IPACertificates *ipaCertificatesView;
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     return cell;
   }
+  if (path.section == 2) {
+    if (path.row == 0) {
+      BOOL checking = [ipaShellState[@"UpdateChecking"] boolValue];
+      BOOL failed = [ipaShellState[@"UpdateCheckFailed"] boolValue];
+      NSTimeInterval checked = [ipaShellState[@"UpdateCheckedAt"] doubleValue];
+      NSString *title = @"Check for Updates";
+      NSString *detail = @"Checks GitHub for a newer release";
+      if (checking) {
+        title = @"Checking for Updates…";
+        detail = @"Checking GitHub for a newer release";
+      } else if (checked > 0) {
+        if (failed) {
+          title = @"Couldn’t Check for Updates";
+          detail = [NSString
+              stringWithFormat:@"%@\nTap to try again.",
+                               ipaShellState[@"UpdateMessage"]
+                                   ?: @"Check your internet connection."];
+        } else {
+          NSString *version = ipaShellState[@"UpdateVersion"];
+          title = version.length
+                      ? [NSString stringWithFormat:@"IPA Loader %@ Available",
+                                                   version]
+                      : @"Up to Date";
+          NSDateFormatter *formatter = [NSDateFormatter new];
+          formatter.dateStyle = NSDateFormatterShortStyle;
+          formatter.timeStyle = NSDateFormatterMediumStyle;
+          formatter.doesRelativeDateFormatting = YES;
+          detail = [NSString
+              stringWithFormat:
+                  @"Last checked %@. Tap to check again.",
+                  [formatter
+                      stringFromDate:
+                          [NSDate dateWithTimeIntervalSince1970:checked]]];
+        }
+      }
+      UITableViewCell *cell =
+          ipaTextCell(title, detail, YES, ready && !checking);
+      if (checking) {
+        UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc]
+            initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+        [spinner startAnimating];
+        cell.accessoryView = spinner;
+      } else if (checked > 0 && !failed) {
+        cell.accessoryView = [[UIImageView alloc]
+            initWithImage:[UIImage
+                              systemImageNamed:[ipaShellState[@"UpdateVersion"]
+                                                   length]
+                                                   ? @"arrow.down.circle"
+                                                   : @"checkmark.circle"]];
+      }
+      return cell;
+    }
+    BOOL connected = ![ipaShellState[@"VPNAvailable"] boolValue] ||
+                     [ipaShellState[@"VPNConnected"] boolValue];
+    return ipaTextCell(
+        @"Download and Install Update",
+        [NSString
+            stringWithFormat:@"IPA Loader %@", ipaShellState[@"UpdateVersion"]],
+        YES,
+        ready && signedIn && connected &&
+            ![ipaShellState[@"UpdateChecking"] boolValue]);
+  }
   return [UITableViewCell new];
 }
 - (void)toggleVPN:(UISwitch *)toggle {
@@ -354,6 +421,17 @@ static IPACertificates *ipaCertificatesView;
           choice.popoverPresentationController.sourceView.bounds;
       [self presentViewController:choice animated:YES completion:nil];
     }
+    return;
+  }
+  if (path.section == 2) {
+    if ([ipaShellState[@"UpdateChecking"] boolValue])
+      return;
+    if (path.row == 0)
+      ipaSend(@{@"Kind" : @"checkupdate"});
+    else if (signedIn && [ipaShellState[@"UpdateVersion"] length] &&
+             (![ipaShellState[@"VPNAvailable"] boolValue] ||
+              [ipaShellState[@"VPNConnected"] boolValue]))
+      ipaSend(@{@"Kind" : @"update"});
     return;
   }
   if (path.section != 1)
@@ -601,6 +679,9 @@ UIViewController *ipa_ios_account_controller(void) {
                     object:nil
                      queue:NSOperationQueue.mainQueue
                 usingBlock:^(NSNotification *note) {
+                  if ([note.name
+                          isEqual:UIApplicationDidBecomeActiveNotification])
+                    ipaSend(@{@"Kind" : @"checkupdateauto"});
                   ipaSend(@{
                     @"Kind" : [note.name
                         isEqual:NEVPNConfigurationChangeNotification]
@@ -632,12 +713,16 @@ void ipa_ios_shell_update(const char *json) {
     BOOL settingsChanged = ipaStateChanged(ipaShellState, state, @[
       @"Authenticated", @"Busy", @"Username", @"AccountMessage", @"Accounts",
       @"Teams", @"TeamID", @"Quota", @"SignInUsername", @"VPNAvailable",
-      @"VPNConnected", @"VPNBusy", @"VPNRequested", @"VPNMessage"
+      @"VPNConnected", @"VPNBusy", @"VPNRequested", @"VPNMessage",
+      @"UpdateChecking", @"UpdateVersion", @"UpdateMessage", @"UpdateCheckedAt",
+      @"UpdateCheckFailed"
     ]);
     BOOL certificatesChanged = ipaStateChanged(
         ipaShellState, state,
         @[ @"Certificates", @"Busy", @"AccountMessage", @"Teams", @"TeamID" ]);
     ipaShellState = state;
+    ipaAccountView.navigationController.tabBarItem.badgeValue =
+        [state[@"UpdateVersion"] length] ? @"1" : nil;
     if (settingsChanged) {
       [ipaAccountView reloadWhenIdle];
       [ipaAccountsView reloadWhenIdle];

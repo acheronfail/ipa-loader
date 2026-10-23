@@ -128,6 +128,9 @@ func (h *iosHost) sharingLibrary(e *engine) (string, error) {
 func IOSExecutable() string { p, _ := os.Executable(); return p }
 
 func (h *iosHost) install(e *engine, app appInfo, d Device, result *Result, notify func(float64, string)) error {
+	if updating, _ := e.ctx.Value(selfUpdateKey{}).(bool); updating && app.BundleID != iosnative.BundleID() {
+		return failure("The update would change IPA Loader’s installed identity. Use the original developer team.")
+	}
 	end := iosnative.BeginTask()
 	defer end()
 	if app.BundleID == iosnative.BundleID() {
@@ -152,7 +155,11 @@ func (h *iosHost) install(e *engine, app appInfo, d Device, result *Result, noti
 		if err = securestore.Write(filepath.Join(root, "ipa-loader", "refresh-receipt.secret"), raw); err != nil {
 			return err
 		}
-		notify(.64, "Refreshing IPA Loader. Return to the Home Screen when installation starts, then reopen it")
+		message := "Refreshing IPA Loader. Return to the Home Screen when installation starts, then reopen it"
+		if updating, _ := e.ctx.Value(selfUpdateKey{}).(bool); updating {
+			message = "Updating IPA Loader. Return to the Home Screen when installation starts, then reopen it"
+		}
+		notify(.64, message)
 	}
 	var binding *refreshBinding
 	if identity, loadErr := h.vault.Load(h.team); loadErr == nil {

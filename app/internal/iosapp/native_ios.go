@@ -15,6 +15,7 @@ import (
 	"ipa-loader/app/internal/apple"
 	"ipa-loader/app/internal/authclient"
 	"ipa-loader/app/internal/iosnative"
+	"ipa-loader/app/internal/iosupdate"
 	"ipa-loader/app/internal/ipa"
 	"ipa-loader/app/internal/platform"
 )
@@ -47,7 +48,16 @@ func Run() {
 			Message string
 		}{apps, message}
 	}
+	updater := iosupdate.New()
 	services := Services{
+		CheckUpdate: func(ctx context.Context) (*iosupdate.Release, error) {
+			return updater.Check(ctx, platform.IOSLoaderVersion(), iosnative.HasVPN())
+		},
+		DownloadUpdate: updater.Download,
+		UpdateTeam:     platform.IOSLoaderTeam,
+		InstallUpdate: func(ctx context.Context, s *apple.Session, team, path string, d platform.Device, p func(platform.Progress)) (platform.Result, error) {
+			return platform.UpdateIOSLoader(ctx, client, s, team, path, d, p)
+		},
 		Accounts: accounts.Native(), Login: client.Login, Teams: client.Teams,
 		Device: func(ctx context.Context) (platform.Device, error) {
 			timeout, cancel := context.WithTimeout(ctx, deviceTimeout)

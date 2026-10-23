@@ -32,7 +32,7 @@ with zipfile.ZipFile(p/'sharing-ios.zip','w',zipfile.ZIP_DEFLATED) as z:
  for member in sorted((p/'sharing-ios').rglob('*')):
   if member.is_file():z.write(member,member.relative_to(p/'sharing-ios'))
 shutil.rmtree(p/'sharing-ios')
-version=os.environ.get('IPA_LOADER_IOS_VERSION','0.1.0')
+version=os.environ.get('IPA_LOADER_IOS_VERSION','0.2.0')
 build=os.environ.get('IPA_LOADER_IOS_BUILD','16')
 if not re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}',build): raise SystemExit('Invalid IPA_LOADER_IOS_BUILD')
 info=dict(CFBundleExecutable='ipa-loader',CFBundleIdentifier='org.ipaloader.ios',CFBundleName='IPA Loader',CFBundleDisplayName='IPA Loader',CFBundlePackageType='APPL',CFBundleShortVersionString=version,CFBundleVersion=build,MinimumOSVersion='15.0',LSRequiresIPhoneOS=True,UIDeviceFamily=[1,2],UIFileSharingEnabled=True,LSSupportsOpeningDocumentsInPlace=True,UILaunchScreen={},UISupportedInterfaceOrientations=['UIInterfaceOrientationPortrait','UIInterfaceOrientationLandscapeLeft','UIInterfaceOrientationLandscapeRight'],NSLocalNetworkUsageDescription='Connect to this iPhone through LocalDevVPN to install and refresh your apps.')

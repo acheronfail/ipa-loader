@@ -129,7 +129,11 @@ func BootstrapLoader(ctx context.Context, client *apple.Client, s *apple.Session
 	if err := verifySelfIPA(*c); err != nil {
 		return Result{}, err
 	}
-	return Sideload(ctx, client, s, team, selfIPAPath(), d, progress)
+	path, err := iosSelfRefreshPackage()
+	if err != nil {
+		return Result{}, err
+	}
+	return Sideload(ctx, client, s, team, path, d, progress)
 }
 
 // SetIOSDeviceAddress permits matching a changed LocalDevVPN Device IP.

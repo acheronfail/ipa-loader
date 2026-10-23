@@ -43,7 +43,7 @@ cat > "$bundle/Contents/Info.plist" <<PLIST
 <key>CFBundleName</key><string>IPA Loader</string>
 <key>CFBundleDisplayName</key><string>IPA Loader</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
+<key>CFBundleShortVersionString</key><string>${IPA_LOADER_IOS_VERSION:-0.2.0}</string>
 <key>CFBundleVersion</key><string>1</string>
 <key>CFBundleIconFile</key><string>AppIcon.icns</string>
 <key>NSHighResolutionCapable</key><true/>

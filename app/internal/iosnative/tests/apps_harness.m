@@ -15,6 +15,7 @@ static BOOL cancelledOperation;
 static BOOL builtinVPN = YES;
 static NSURL *openedURL;
 static NSString *lastAction;
+static NSDictionary *updateState;
 @interface HarnessApplication : UIApplication
 @end
 @implementation HarnessApplication
@@ -84,7 +85,10 @@ static void publish(BOOL signedIn, BOOL busy, NSString *message) {
     @"VPNAvailable" : @(builtinVPN),
     @"VPNConnected" : @(builtinVPN)
   };
-  NSData *data = [NSJSONSerialization dataWithJSONObject:state
+  NSMutableDictionary *fullState = [state mutableCopy];
+  if (updateState)
+    [fullState addEntriesFromDictionary:updateState];
+  NSData *data = [NSJSONSerialization dataWithJSONObject:fullState
                                                  options:0
                                                    error:nil];
   ipa_ios_apps_authenticated(signedIn);
@@ -237,6 +241,12 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
             publish(YES, YES, @"1 of 2 · Sample\nChecking signing profile…");
         });
   } else if ([NSProcessInfo.processInfo.arguments
+                 containsObject:@"--update-feedback-checks"]) {
+    [self runUpdateFeedbackChecks];
+  } else if ([NSProcessInfo.processInfo.arguments
+                 containsObject:@"--update-checks"]) {
+    [self runUpdateChecks];
+  } else if ([NSProcessInfo.processInfo.arguments
                  containsObject:@"--connection-checks"]) {
     builtinVPN =
         ![NSProcessInfo.processInfo.arguments containsObject:@"--localdevvpn"];
@@ -244,6 +254,156 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
   } else
     [self runChecks];
   return YES;
+}
+- (void)runUpdateFeedbackChecks {
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+      dispatch_get_main_queue(), ^{
+        NSArray *cases = @[
+          @{
+            @"state" : @{@"UpdateCheckedAt" : @1234567890},
+            @"title" : @"Up to Date",
+            @"detail" : @"Last checked"
+          },
+          @{
+            @"state" : @{@"UpdateCheckedAt" : @1234567891},
+            @"title" : @"Up to Date",
+            @"detail" : @"Last checked"
+          },
+          @{
+            @"state" : @{
+              @"UpdateCheckedAt" : @1234567892,
+              @"UpdateVersion" : @"1.2.0"
+            },
+            @"title" : @"IPA Loader 1.2.0 Available",
+            @"detail" : @"Last checked"
+          },
+          @{
+            @"state" : @{
+              @"UpdateCheckedAt" : @1234567893,
+              @"UpdateCheckFailed" : @YES,
+              @"UpdateMessage" : @"You are offline."
+            },
+            @"title" : @"Couldn’t Check for Updates",
+            @"detail" : @"You are offline."
+          },
+          @{
+            @"state" : @{@"UpdateChecking" : @YES},
+            @"title" : @"Checking for Updates…",
+            @"detail" : @"Checking GitHub"
+          }
+        ];
+        for (NSDictionary *test in cases) {
+          updateState = test[@"state"];
+          publish(NO, NO, @"");
+          dispatch_async(dispatch_get_main_queue(), ^{
+            UINavigationController *nav =
+                (UINavigationController *)ipaAccountNavigation;
+            UITableViewController *settings =
+                (UITableViewController *)nav.topViewController;
+            ipaTabs.selectedIndex = 1;
+            NSIndexPath *path = [NSIndexPath indexPathForRow:0 inSection:2];
+            UITableViewCell *cell =
+                [settings.tableView.dataSource tableView:settings.tableView
+                                   cellForRowAtIndexPath:path];
+            NSCAssert([cell.textLabel.text isEqual:test[@"title"]],
+                      @"Update outcome is not visible beside the action");
+            NSCAssert(
+                [cell.detailTextLabel.text containsString:test[@"detail"]],
+                @"Update detail missing");
+            BOOL checking = [test[@"state"][@"UpdateChecking"] boolValue];
+            NSCAssert([cell.accessoryView
+                          isKindOfClass:UIActivityIndicatorView.class] ==
+                          checking,
+                      @"Checking indicator is incorrect");
+            lastAction = nil;
+            [settings.tableView.delegate tableView:settings.tableView
+                           didSelectRowAtIndexPath:path];
+            NSCAssert(checking ? lastAction == nil
+                               : [lastAction isEqual:@"checkupdate"],
+                      @"Result row cannot be checked again");
+          });
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+          NSLog(@"PASS: update results persist beside the action with "
+                @"timestamps, retry and checking feedback");
+          exit(0);
+        });
+      });
+}
+- (void)runUpdateChecks {
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+      dispatch_get_main_queue(), ^{
+        ipaTabs.selectedIndex = 1;
+        updateState = @{
+          @"UpdateVersion" : @"1.2.0",
+          @"UpdateMessage" : @"New release available"
+        };
+        publish(NO, NO, @"");
+        dispatch_async(dispatch_get_main_queue(), ^{
+          UINavigationController *nav =
+              (UINavigationController *)ipaAccountNavigation;
+          UITableViewController *settings =
+              (UITableViewController *)nav.topViewController;
+          NSIndexPath *check = [NSIndexPath indexPathForRow:0 inSection:2];
+          NSIndexPath *install = [NSIndexPath indexPathForRow:1 inSection:2];
+          NSCAssert([settings.tableView.dataSource tableView:settings.tableView
+                                       numberOfRowsInSection:2] == 2,
+                    @"Update rows missing");
+          UITableViewCell *cell =
+              [settings.tableView.dataSource tableView:settings.tableView
+                                 cellForRowAtIndexPath:install];
+          NSCAssert(
+              [cell.textLabel.text isEqual:@"Download and Install Update"],
+              @"Update button missing");
+          lastAction = nil;
+          [settings.tableView.delegate tableView:settings.tableView
+                         didSelectRowAtIndexPath:install];
+          NSCAssert(lastAction == nil, @"Signed-out update allowed");
+          [settings.tableView.delegate tableView:settings.tableView
+                         didSelectRowAtIndexPath:check];
+          NSCAssert([lastAction isEqual:@"checkupdate"],
+                    @"Check action missing");
+          NSCAssert([nav.tabBarItem.badgeValue isEqual:@"1"],
+                    @"Available update badge missing");
+          updateState = @{@"UpdateVersion" : @"1.2.0", @"VPNConnected" : @NO};
+          publish(YES, NO, @"");
+          dispatch_async(dispatch_get_main_queue(), ^{
+            ipaTabs.selectedIndex = 1;
+            lastAction = nil;
+            [settings.tableView.delegate tableView:settings.tableView
+                           didSelectRowAtIndexPath:install];
+            NSCAssert(lastAction == nil,
+                      @"Update allowed with built-in VPN off");
+            updateState = @{@"UpdateVersion" : @"1.2.0"};
+            publish(YES, NO, @"");
+            dispatch_async(dispatch_get_main_queue(), ^{
+              [settings.tableView.delegate tableView:settings.tableView
+                             didSelectRowAtIndexPath:install];
+              NSCAssert([lastAction isEqual:@"update"],
+                        @"Update action missing");
+              updateState =
+                  @{@"UpdateVersion" : @"1.2.0", @"Operation" : @"update"};
+              publish(YES, YES, @"Downloading IPA Loader…");
+            });
+          });
+        });
+      });
+  waitForUI(
+      ^BOOL {
+        UINavigationController *sheet =
+            (UINavigationController *)ipaTabs.presentedViewController;
+        return [sheet isKindOfClass:UINavigationController.class] &&
+               [sheet.topViewController.title isEqual:@"Update IPA Loader"] &&
+               sheet.topViewController.view.window != nil;
+      },
+      ^{
+        NSCAssert(ipaTabs.selectedIndex == 1, @"Update left Settings tab");
+        NSLog(@"PASS: update discovery, account and VPN gating, actions and "
+              @"progress from Settings");
+        exit(0);
+      });
 }
 - (void)runConnectionChecks {
   dispatch_after(
@@ -443,8 +603,8 @@ static void waitForUI(BOOL (^ready)(void), dispatch_block_t check) {
         NSCAssert(!account.presentedViewController,
                   @"Single developer team opened a picker");
         NSCAssert([account.tableView.dataSource tableView:account.tableView
-                                    numberOfRowsInSection:2] == 0,
-                  @"About row remains");
+                                    numberOfRowsInSection:2] == 1,
+                  @"Check for Updates row missing");
         NSCAssert([[account.tableView.dataSource tableView:account.tableView
                                    titleForFooterInSection:2]
                       containsString:@"IPA Loader"],

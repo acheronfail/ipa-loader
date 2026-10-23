@@ -53,3 +53,11 @@ for variant in builtin localdevvpn; do
  cat "$test_root/output"
  grep -Eq "PASS: .* connection controls, copy, routing and App Store links" "$test_root/output"
 done
+
+xcrun simctl launch --console "$1" "$identifier" --update-checks >"$test_root/output" 2>&1
+cat "$test_root/output"
+grep -Fq "PASS: update discovery, account and VPN gating, actions and progress from Settings" "$test_root/output"
+
+xcrun simctl launch --console "$1" "$identifier" --update-feedback-checks >"$test_root/output" 2>&1
+cat "$test_root/output"
+grep -Fq "PASS: update results persist beside the action with timestamps, retry and checking feedback" "$test_root/output"

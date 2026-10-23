@@ -6,6 +6,12 @@ Windows and creates a **draft** GitHub release. Reruns may update a draft but
 cannot replace assets in an already published release. Normal `master` builds
 run verification without signing credentials or Apple submissions.
 
+The iPhone updater reads the latest published stable release from this repository
+and requires the existing free/paid IPA asset names and GitHub-provided SHA-256
+digests. The tag supplies the IPA version; publish a higher `vX.Y.Z` to offer an
+update. The first version containing the updater must be installed through the
+existing desktop setup flow.
+
 ## Shared macOS release Action
 
 The workflow uses `dist-tools/actions/apple-release@v1`, which tracks compatible
@@ -65,7 +71,10 @@ The compatibility `apple-id` mode uses `APPLE_NOTARY_APPLE_ID` and
 `APPLE_NOTARY_PASSWORD` (an app-specific password). A missing mode variable keeps
 that legacy behavior. Prefer a dedicated API key for new setup.
 
-Local `just release` produces an ad-hoc signed development package.
+Local `just release` produces an ad-hoc signed development package. Local iOS
+and macOS versions default to `0.2.0`; `IPA_LOADER_IOS_VERSION` overrides both
+(the tag workflow supplies this automatically). Run `just ios` before packaging
+a local desktop build to replace any previously generated iPhone IPAs.
 
 ## Reliability and rollback
 

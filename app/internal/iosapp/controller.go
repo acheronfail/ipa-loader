@@ -15,12 +15,16 @@ import (
 
 	"ipa-loader/app/internal/accounts"
 	"ipa-loader/app/internal/apple"
+	"ipa-loader/app/internal/iosupdate"
 	"ipa-loader/app/internal/ipa"
 	"ipa-loader/app/internal/platform"
 )
 
 type Action struct{ Kind, Value, Username, Password string }
 type State struct {
+	UpdateChecking, UpdateCheckFailed                       bool
+	UpdateCheckedAt                                         int64
+	UpdateVersion, UpdateMessage                            string
 	Authenticated, Busy                                     bool
 	VPNAvailable, VPNConnected, VPNBusy, VPNRequested       bool
 	VPNMessage                                              string
@@ -38,6 +42,10 @@ type State struct {
 	Certificates                                            []apple.DevelopmentCertificate
 }
 type Services struct {
+	CheckUpdate     func(context.Context) (*iosupdate.Release, error)
+	DownloadUpdate  func(context.Context, iosupdate.Release, func(int64, int64)) (string, error)
+	InstallUpdate   func(context.Context, *apple.Session, string, string, platform.Device, func(platform.Progress)) (platform.Result, error)
+	UpdateTeam      func() string
 	Accounts        *accounts.Store
 	Login           func(context.Context, string, string, func(apple.Challenge) (string, error)) (*apple.Session, error)
 	Teams           func(context.Context, *apple.Session) ([]apple.Team, error)
@@ -59,14 +67,16 @@ type Services struct {
 	Reload          func()
 }
 type Controller struct {
-	mu           sync.Mutex
-	services     Services
-	state        State
-	session      *apple.Session
-	saved        []*apple.Session
-	cancel       context.CancelFunc
-	certificates []apple.DevelopmentCertificate
-	apps         []platform.IOSApp
+	mu              sync.Mutex
+	services        Services
+	state           State
+	session         *apple.Session
+	saved           []*apple.Session
+	cancel          context.CancelFunc
+	certificates    []apple.DevelopmentCertificate
+	apps            []platform.IOSApp
+	update          *iosupdate.Release
+	nextUpdateCheck time.Time
 }
 
 func accountOperation(operation string) bool { return operation == "account" || operation == "signin" }
@@ -96,7 +106,7 @@ func (c *Controller) begin(auth bool, operation, target string) (context.Context
 		c.publish()
 		return nil, false
 	}
-	if (operation == "refresh" || operation == "install" || operation == "refreshall") && c.state.VPNAvailable && !c.state.VPNConnected {
+	if (operation == "refresh" || operation == "install" || operation == "refreshall" || operation == "update") && c.state.VPNAvailable && !c.state.VPNConnected {
 		c.mu.Unlock()
 		c.publish()
 		return nil, false
@@ -183,8 +193,15 @@ func (c *Controller) Handle(a Action) {
 	}
 	switch a.Kind {
 	case "start":
+		go c.checkUpdate(false)
 		c.updateVPN()
 		c.restore()
+	case "checkupdateauto":
+		c.checkUpdate(false)
+	case "checkupdate":
+		c.checkUpdate(true)
+	case "update":
+		c.installUpdate()
 	case "vpnstatus":
 		c.updateVPN()
 	case "vpnconfiguration":
